@@ -30,9 +30,25 @@ export function App() {
     getStoredItem(STORAGE_KEYS.USER_DATA, mockUserData)
   );
 
-  const [stats] = useState(() => 
-    getStoredItem(STORAGE_KEYS.STATS, mockStats)
-  );
+  const [stats, setStats] = useState(() => {
+    const stored = getStoredItem(STORAGE_KEYS.STATS, mockStats);
+    if (stored && (stored.overallProgress === 68 || !stored.overallProgress)) {
+      setStoredItem(STORAGE_KEYS.STATS, mockStats);
+      return mockStats;
+    }
+    return stored;
+  });
+
+  // Self-healing: clear legacy v1 caches
+  useEffect(() => {
+    try {
+      localStorage.removeItem('archer_realm_stats');
+      localStorage.removeItem('archer_realm_custom_flashcards');
+      localStorage.removeItem('archer_realm_custom_boss_quizzes');
+    } catch (e) {
+      // Ignore
+    }
+  }, []);
 
   // Sync activeTab changes to storage
   const handleSelectTab = (tabId) => {
