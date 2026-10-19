@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Mic, Activity, ArrowLeft, AlertCircle, Award, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Mic, Activity, ArrowLeft, AlertCircle, Award, RotateCcw, Plus, Sparkles } from 'lucide-react';
 
 import { mockSpeechSentences } from '../../data/mockSpeechSentences';
 import { SentenceCard } from './SentenceCard';
@@ -14,8 +14,11 @@ import {
 import { playSuccessSound, playVictoryFanfare } from '../../utils/audio';
 import { getStoredItem, setStoredItem, STORAGE_KEYS } from '../../utils/storage';
 
-export const SpeechLabView = ({ onBackToDashboard }) => {
-  const sentences = useMemo(() => [...mockSpeechSentences], []);
+export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
+  const [sentences, setSentences] = useState(() => {
+    const stored = getStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, []);
+    return stored.length > 0 ? stored : [...mockSpeechSentences];
+  });
   const totalSentences = sentences.length;
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -25,6 +28,10 @@ export const SpeechLabView = ({ onBackToDashboard }) => {
   const [results, setResults] = useState(null);
   const [micError, setMicError] = useState(null);
   const [isCompleted, setIsCompleted] = useState(false);
+
+  // Custom sentence input state
+  const [customInput, setCustomInput] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Recognition instance & transcript ref
   const recognitionRef = useRef(null);
@@ -46,6 +53,31 @@ export const SpeechLabView = ({ onBackToDashboard }) => {
       }
     };
   }, []);
+
+  // Handle adding custom sentence to practice immediately
+  const handleAddCustomSentence = (e) => {
+    if (e) e.preventDefault();
+    const text = customInput.trim();
+    if (!text) return;
+    const words = text.split(/\s+/).map((w) => w.replace(/[^a-zA-Z]/g, '')).filter((w) => w.length > 3);
+    const newObj = {
+      id: `custom-speech-${Date.now()}`,
+      sentence: text,
+      category: 'Latihan Kustom',
+      difficulty: 'Pribadi',
+      focusWords: words.slice(0, 4),
+      phoneticTips: 'Lafalkan kata dengan artikulasi jelas dan ritme natural.',
+    };
+    const updated = [newObj, ...sentences];
+    setSentences(updated);
+    setStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, updated);
+    setCustomInput('');
+    setCurrentIndex(0);
+    setResults(null);
+    setLiveTranscript('');
+    setIsCompleted(false);
+    setShowAddModal(false);
+  };
 
   // Pure Manual Toggle: 1st Click = Start, 2nd Click = Stop & Score
   const handleToggleRecord = () => {
@@ -146,7 +178,8 @@ export const SpeechLabView = ({ onBackToDashboard }) => {
               const vocabMetric = currentStats.metrics.find((m) => m.id === 'vocabulary');
               if (vocabMetric) {
                 const parts = vocabMetric.value.split('/');
-                const currentCount = parseInt(parts[0], 10) || 842;
+                const parsedCount = parseInt(parts[0], 10);
+                const currentCount = isNaN(parsedCount) ? 0 : parsedCount;
                 const totalCount = parseInt(parts[1], 10) || 1200;
                 vocabMetric.value = `${Math.min(currentCount + 1, totalCount)} / ${totalCount}`;
                 setStoredItem(STORAGE_KEYS.STATS, currentStats);
@@ -224,13 +257,23 @@ export const SpeechLabView = ({ onBackToDashboard }) => {
           </div>
         </div>
 
-        {/* Right Badge: TKA English with Sound Waves */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold shadow">
-          <Activity className="w-4 h-4 text-emerald-400" />
-          <span className="hidden sm:inline">TKA English</span>
-          <span className="text-slate-400 font-mono text-[11px]">
-            {currentIndex + 1}/{totalSentences}
-          </span>
+        {/* Right Badges & Add Sentence Button */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold transition cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Input Kalimat</span>
+          </button>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold shadow">
+            <Activity className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">TKA English</span>
+            <span className="text-slate-400 font-mono text-[11px]">
+              {totalSentences === 0 ? '0/0' : `${currentIndex + 1}/${totalSentences}`}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -255,8 +298,45 @@ export const SpeechLabView = ({ onBackToDashboard }) => {
         </div>
       )}
 
-      {/* 4. Completion Screen or Active Practice */}
-      {isCompleted ? (
+      {/* 4. Empty State, Completion Screen, or Active Practice */}
+      {totalSentences === 0 ? (
+        <div className="p-6 sm:p-10 rounded-2xl bg-[#0f1828]/95 border border-slate-800 text-center flex flex-col items-center justify-center space-y-4 shadow-xl">
+          <div className="p-3.5 rounded-2xl bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+            <Mic className="w-8 h-8" />
+          </div>
+          <div className="max-w-md">
+            <h3 className="text-lg font-bold text-white tracking-tight">Speech Lab Siap Digunakan</h3>
+            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+              Data kalimat bawaan telah dikosongkan. Ketik atau tempelkan kalimat bahasa Inggris yang ingin Anda latih pengucapannya:
+            </p>
+          </div>
+          <form onSubmit={handleAddCustomSentence} className="w-full max-w-lg space-y-3 pt-2">
+            <textarea
+              value={customInput}
+              onChange={(e) => setCustomInput(e.target.value)}
+              placeholder="Contoh: The government should invest more in renewable energy sources."
+              rows={3}
+              className="w-full p-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:border-indigo-400"
+            />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => (onNavigateTab ? onNavigateTab('uploader') : onBackToDashboard())}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
+              >
+                Buka Menu Uploader
+              </button>
+              <button
+                type="submit"
+                disabled={!customInput.trim()}
+                className="px-5 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 text-white font-bold text-xs sm:text-sm transition shadow-lg active:scale-95 cursor-pointer"
+              >
+                Mulai Latih Kalimat Ini
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : isCompleted ? (
         <div className="p-8 sm:p-10 rounded-2xl bg-[#0f1828]/95 border border-indigo-500/30 text-center flex flex-col items-center space-y-4 shadow-2xl">
           <div className="w-16 h-16 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
             <Award className="w-8 h-8" />
@@ -313,6 +393,51 @@ export const SpeechLabView = ({ onBackToDashboard }) => {
             )}
           </div>
         )
+      )}
+
+      {/* Modal Input Kalimat Baru */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="w-full max-w-lg rounded-2xl bg-[#0f1828] border border-slate-700 p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Mic className="w-4 h-4 text-indigo-400" />
+                Input Kalimat Latihan Baru
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <textarea
+              value={customInput}
+              onChange={(e) => setCustomInput(e.target.value)}
+              placeholder="Ketik kalimat bahasa Inggris yang ingin kamu latih..."
+              rows={3}
+              className="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-400"
+            />
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleAddCustomSentence}
+                disabled={!customInput.trim()}
+                className="px-5 py-2 rounded-xl bg-indigo-500 text-white font-bold text-xs hover:bg-indigo-400 disabled:opacity-40 cursor-pointer"
+              >
+                Mulai Latih
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

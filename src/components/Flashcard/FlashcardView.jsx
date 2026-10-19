@@ -12,7 +12,7 @@ import { getStoredItem, setStoredItem, STORAGE_KEYS } from '../../utils/storage'
 import { shuffleArray } from '../../utils/shuffle';
 import { fetchCustomFlashcards } from '../../services/supabaseClient';
 
-export const FlashcardView = ({ onBackToDashboard }) => {
+export const FlashcardView = ({ onBackToDashboard, onNavigateTab }) => {
   // Helper to load and dynamically shuffle the deck (Fisher-Yates)
   const getShuffledCards = useCallback((customList = null) => {
     const customCards = customList || getStoredItem(STORAGE_KEYS.CUSTOM_FLASHCARDS, []);
@@ -91,8 +91,8 @@ export const FlashcardView = ({ onBackToDashboard }) => {
         if (currentStats && currentStats.metrics) {
           const vocabMetric = currentStats.metrics.find((m) => m.id === 'vocabulary');
           if (vocabMetric) {
-            const parts = vocabMetric.value.split('/');
-            const currentCount = parseInt(parts[0], 10) || 842;
+            const parsedCount = parseInt(parts[0], 10);
+            const currentCount = isNaN(parsedCount) ? 0 : parsedCount;
             const totalCount = parseInt(parts[1], 10) || 1200;
             vocabMetric.value = `${Math.min(currentCount + 1, totalCount)} / ${totalCount}`;
             setStoredItem(STORAGE_KEYS.STATS, currentStats);
@@ -220,8 +220,27 @@ export const FlashcardView = ({ onBackToDashboard }) => {
         </div>
       </div>
 
-      {/* 2. Main Duel Arena or Completion Screen */}
-      {isDeckCompleted ? (
+      {/* 2. Main Duel Arena or Completion / Empty Screen */}
+      {totalCardsCount === 0 ? (
+        <div className="p-8 sm:p-12 rounded-2xl bg-[#0f1828]/90 border border-slate-800 text-center flex flex-col items-center justify-center space-y-4 shadow-xl">
+          <div className="p-4 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <Layers className="w-8 h-8" />
+          </div>
+          <div className="max-w-md">
+            <h3 className="text-lg font-bold text-white">Belum Ada Kartu Flashcard</h3>
+            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+              Data kartu bawaan telah dikosongkan. Unggah dokumen latihan atau catatan materi TKA di menu Uploader untuk membuat Flashcard baru dengan AI.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => (onNavigateTab ? onNavigateTab('uploader') : onBackToDashboard())}
+            className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-lg active:scale-95 cursor-pointer"
+          >
+            Buka Menu Uploader
+          </button>
+        </div>
+      ) : isDeckCompleted ? (
         <CompletionCard 
           stats={sessionStats} 
           onRestart={handleRestart} 

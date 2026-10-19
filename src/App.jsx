@@ -64,6 +64,7 @@ export function App() {
         return (
           <FlashcardView 
             onBackToDashboard={() => handleSelectTab('dashboard')} 
+            onNavigateTab={handleSelectTab}
           />
         );
       case 'boss_arena':
@@ -71,12 +72,14 @@ export function App() {
           <BossArenaView 
             activeCharacter={activeCharacter}
             onBackToDashboard={() => handleSelectTab('dashboard')}
+            onNavigateTab={handleSelectTab}
           />
         );
       case 'speech_lab':
         return (
           <SpeechLabView 
             onBackToDashboard={() => handleSelectTab('dashboard')} 
+            onNavigateTab={handleSelectTab}
           />
         );
       case 'uploader':

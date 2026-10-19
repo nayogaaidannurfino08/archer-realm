@@ -47,7 +47,8 @@ export const GeneratedPreview = ({
       const vocabMetric = stats.metrics.find((m) => m.id === 'vocabulary');
       if (vocabMetric) {
         const parts = vocabMetric.value.split('/');
-        const currentCount = parseInt(parts[0], 10) || 842;
+        const parsedCount = parseInt(parts[0], 10);
+        const currentCount = isNaN(parsedCount) ? 0 : parsedCount;
         const totalCount = parseInt(parts[1], 10) || 1200;
         vocabMetric.value = `${Math.min(currentCount + flashcards.length, totalCount)} / ${totalCount}`;
         setStoredItem(STORAGE_KEYS.STATS, stats);

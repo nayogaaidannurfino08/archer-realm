@@ -1,28 +1,28 @@
-// Mock Statistics Data for Archer Realm Dashboard
+// Statistics Data for Archer Realm Dashboard (Reset to 0 for fresh start)
 export const mockStats = {
-  overallProgress: 68,
+  overallProgress: 0,
   progressLabel: "Progress TKA English",
-  xp: 4250,
-  level: 12,
+  xp: 0,
+  level: 1,
   metrics: [
     {
       id: "streak",
       label: "Streak",
-      value: "7 hari",
+      value: "0 hari",
       iconType: "flame",
       badgeColor: "amber",
     },
     {
       id: "vocabulary",
       label: "Kosakata Dikuasai",
-      value: "842 / 1200",
+      value: "0 / 1200",
       iconType: "book",
       badgeColor: "cyan",
     },
     {
       id: "daily_target",
       label: "Target Hari Ini",
-      value: "120 kata",
+      value: "0 kata",
       iconType: "target",
       badgeColor: "emerald",
     },

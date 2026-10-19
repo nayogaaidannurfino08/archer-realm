@@ -2,7 +2,7 @@ import React from 'react';
 import { Flame, BookOpen, Target } from 'lucide-react';
 
 export const ProgressCard = ({ stats }) => {
-  const progress = stats?.overallProgress ?? 68;
+  const progress = stats?.overallProgress ?? 0;
   const progressLabel = stats?.progressLabel ?? 'Progress TKA English';
 
   // Helper to map icon types

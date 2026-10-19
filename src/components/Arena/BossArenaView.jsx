@@ -21,7 +21,7 @@ import { getStoredItem, setStoredItem, STORAGE_KEYS } from '../../utils/storage'
 import { shuffleArray } from '../../utils/shuffle';
 import { fetchCustomBossQuizzes } from '../../services/supabaseClient';
 
-export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard }) => {
+export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard, onNavigateTab }) => {
   // Helper to load and dynamically shuffle the quizzes (Fisher-Yates)
   const getShuffledQuizzes = useCallback((customList = null) => {
     const customQuizzes = customList || getStoredItem(STORAGE_KEYS.CUSTOM_BOSS_QUIZZES, []);
@@ -127,7 +127,7 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard }
             // Persist XP (+250 XP) in LocalStorage
             const currentStats = getStoredItem(STORAGE_KEYS.STATS, null);
             if (currentStats) {
-              currentStats.xp = (currentStats.xp || 4250) + 250;
+              currentStats.xp = (currentStats.xp || 0) + 250;
               setStoredItem(STORAGE_KEYS.STATS, currentStats);
             }
           }, 500);
@@ -255,8 +255,27 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard }
         </div>
       </div>
 
-      {/* 2. Main Arena Gameplay or Victory/GameOver Screens */}
-      {gameStatus === 'victory' ? (
+      {/* 2. Main Arena Gameplay or Victory/GameOver/Empty Screens */}
+      {totalQuizzes === 0 ? (
+        <div className="p-8 sm:p-12 rounded-2xl bg-[#0f1828]/90 border border-slate-800 text-center flex flex-col items-center justify-center space-y-4 shadow-xl">
+          <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <Swords className="w-8 h-8" />
+          </div>
+          <div className="max-w-md">
+            <h3 className="text-lg font-bold text-white">Belum Ada Soal Boss Arena</h3>
+            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+              Data soal bawaan telah dikosongkan. Unggah dokumen latihan atau catatan materi TKA di menu Uploader untuk menghasilkan tantangan Boss Arena baru dengan AI.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => (onNavigateTab ? onNavigateTab('uploader') : onBackToDashboard())}
+            className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-lg active:scale-95 cursor-pointer"
+          >
+            Buka Menu Uploader
+          </button>
+        </div>
+      ) : gameStatus === 'victory' ? (
         <BossVictoryScreen
           xpGained={250}
           remainingHearts={playerHearts}
