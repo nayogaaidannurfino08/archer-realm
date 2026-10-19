@@ -218,7 +218,7 @@ export const BattleStage = ({
   const isStorm = activeCharacter === 'storm';
 
   return (
-    <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#060b14] h-[200px] sm:h-[225px] shadow-2xl flex flex-col justify-between select-none">
+    <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#060b14] h-44 sm:h-56 shadow-2xl flex flex-col justify-between select-none">
       {/* 1. CLEAN MODERN DARK FANTASY FLAT BACKGROUND (NO REALISTIC IMAGE) */}
       {/* Gradient Night Sky */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#0b1325] via-[#070d18] to-[#040810]" />

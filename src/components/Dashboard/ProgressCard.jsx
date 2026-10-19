@@ -50,20 +50,20 @@ export const ProgressCard = ({ stats }) => {
       </div>
 
       {/* 3 Metric Cards */}
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-3 mt-5 pt-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-4 sm:mt-5 pt-2 sm:pt-3">
         {stats?.metrics?.map((metric) => (
           <div 
             key={metric.id}
-            className="flex items-center gap-2.5 p-2 sm:p-2.5 rounded-xl bg-slate-800/40 border border-slate-800/80 hover:border-slate-700/80 transition"
+            className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-2.5 p-2 sm:p-2.5 rounded-xl bg-slate-800/40 border border-slate-800/80 hover:border-slate-700/80 transition"
           >
-            <div className={`p-2 rounded-lg border shrink-0 ${getMetricBadgeStyle(metric.badgeColor)}`}>
+            <div className={`p-1.5 sm:p-2 rounded-lg border shrink-0 ${getMetricBadgeStyle(metric.badgeColor)}`}>
               {renderMetricIcon(metric.iconType)}
             </div>
-            <div className="min-w-0">
-              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
+            <div className="min-w-0 w-full">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 leading-tight">
                 {metric.label}
               </p>
-              <p className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">
+              <p className="text-[11px] sm:text-sm font-bold text-white tracking-tight leading-tight mt-0.5 break-words">
                 {metric.value}
               </p>
             </div>

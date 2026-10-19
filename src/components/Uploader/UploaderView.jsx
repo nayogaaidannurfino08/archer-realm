@@ -42,9 +42,6 @@ export const UploaderView = ({ onNavigateTab }) => {
   const [errorMessage, setErrorMessage] = useState(null);
   const [parsedResult, setParsedResult] = useState(null);
 
-  // Force re-render of key banner if updated
-  const [, setKeyRefresh] = useState(0);
-
   const isFormValid = activeTab === 'file' ? Boolean(selectedFile) : pastedText.trim().length >= 10;
 
   // Handle parsing action
@@ -142,7 +139,7 @@ export const UploaderView = ({ onNavigateTab }) => {
       </div>
 
       {/* 2. API Key Configuration & Status Banner */}
-      <ApiKeyBanner onKeyChange={() => setKeyRefresh((prev) => prev + 1)} />
+      <ApiKeyBanner />
 
       {/* 3. Result Preview Area (When Available) */}
       {parsedResult ? (

@@ -271,8 +271,8 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard }
           onBackToDashboard={onBackToDashboard}
         />
       ) : (
-        <div className="flex flex-col space-y-3 sm:space-y-3.5">
-          {/* Battle Stage (Compact Height ~200px) */}
+        <div className="flex flex-col space-y-2.5 sm:space-y-3.5">
+          {/* Battle Stage (Compact Height h-44 on mobile ~176px) */}
           <BattleStage
             activeCharacter={activeCharacter}
             playerHearts={playerHearts}
@@ -286,39 +286,39 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard }
 
           {/* Question Box & Direct High-Contrast Action Buttons */}
           {currentQuiz && (
-            <div className="p-4 sm:p-5 rounded-2xl bg-[#0f1828]/95 border border-slate-800/90 shadow-xl flex flex-col space-y-3.5">
+            <div className="p-3 sm:p-5 rounded-2xl bg-[#0f1828]/95 border border-slate-800/90 shadow-xl flex flex-col space-y-2.5 sm:space-y-3.5">
               {/* Question Context */}
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
                   {currentQuiz.questionText}
                 </span>
 
                 {/* Sentence */}
-                <div className="mt-1.5 p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <p className="text-sm sm:text-base font-bold text-white leading-relaxed tracking-tight">
+                <div className="mt-1 p-2.5 sm:p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                  <p className="text-xs sm:text-base font-bold text-white leading-snug sm:leading-relaxed tracking-tight">
                     &ldquo;{currentQuiz.sentence}&rdquo;
                   </p>
                 </div>
               </div>
 
               {/* TWO LARGE HIGH-CONTRAST BUTTONS: A: True vs B: False */}
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 pt-1">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 pt-0.5">
                 {/* Button A: True */}
                 <button
                   type="button"
                   disabled={combatState !== 'idle' || showExplanation}
                   onClick={() => handleSelectAnswer(currentQuiz.options[0])}
-                  className={`group relative flex items-center justify-center gap-2.5 sm:gap-3 p-3.5 sm:p-4 rounded-2xl border-2 font-black text-base sm:text-lg transition-all duration-150 cursor-pointer disabled:opacity-50 active:scale-[0.98] ${
+                  className={`group relative flex items-center justify-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 font-black text-sm sm:text-lg transition-all duration-150 cursor-pointer disabled:opacity-50 active:scale-[0.98] ${
                     selectedOption === 'A'
                       ? 'bg-emerald-500 text-slate-950 border-emerald-300 shadow-[0_0_25px_rgba(16,185,129,0.6)] scale-[1.02]'
                       : 'bg-emerald-500/15 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border-emerald-500/40 hover:border-emerald-400 shadow-[0_4px_15px_rgba(16,185,129,0.15)]'
                   }`}
                 >
-                  <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/30 group-hover:bg-slate-950/20 flex items-center justify-center text-xs font-black shrink-0">
+                  <span className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-emerald-500/30 group-hover:bg-slate-950/20 flex items-center justify-center text-xs font-black shrink-0">
                     A
                   </span>
-                  <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 sm:w-6 sm:h-6 shrink-0" />
                   <span>True (Benar)</span>
                 </button>
 
@@ -327,16 +327,16 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard }
                   type="button"
                   disabled={combatState !== 'idle' || showExplanation}
                   onClick={() => handleSelectAnswer(currentQuiz.options[1])}
-                  className={`group relative flex items-center justify-center gap-2.5 sm:gap-3 p-3.5 sm:p-4 rounded-2xl border-2 font-black text-base sm:text-lg transition-all duration-150 cursor-pointer disabled:opacity-50 active:scale-[0.98] ${
+                  className={`group relative flex items-center justify-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 font-black text-sm sm:text-lg transition-all duration-150 cursor-pointer disabled:opacity-50 active:scale-[0.98] ${
                     selectedOption === 'B'
                       ? 'bg-rose-500 text-white border-rose-300 shadow-[0_0_25px_rgba(244,63,94,0.6)] scale-[1.02]'
                       : 'bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white border-rose-500/40 hover:border-rose-400 shadow-[0_4px_15px_rgba(244,63,94,0.15)]'
                   }`}
                 >
-                  <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-500/30 group-hover:bg-slate-950/20 flex items-center justify-center text-xs font-black shrink-0">
+                  <span className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-rose-500/30 group-hover:bg-slate-950/20 flex items-center justify-center text-xs font-black shrink-0">
                     B
                   </span>
-                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+                  <XCircle className="w-4 h-4 sm:w-6 sm:h-6 shrink-0" />
                   <span>False (Salah)</span>
                 </button>
               </div>

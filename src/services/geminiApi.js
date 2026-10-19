@@ -1,24 +1,10 @@
-import { getStoredItem, setStoredItem, STORAGE_KEYS } from '../utils/storage.js';
-
-// 1. API Key Resolution
+// 1. API Key Resolution (Strictly via Environment Variable)
 export const getGeminiApiKey = () => {
-  // Priority 1: Vite Environment Variable
-  const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const envKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || '';
   if (envKey && envKey.trim().length > 0 && !envKey.includes('your_gemini_api_key')) {
     return envKey.trim();
   }
-
-  // Priority 2: User-supplied Key via UI stored in LocalStorage
-  const storedKey = getStoredItem(STORAGE_KEYS.GEMINI_API_KEY, '');
-  if (storedKey && storedKey.trim().length > 0) {
-    return storedKey.trim();
-  }
-
   return '';
-};
-
-export const saveCustomApiKey = (key) => {
-  setStoredItem(STORAGE_KEYS.GEMINI_API_KEY, key.trim());
 };
 
 export const hasGeminiApiKey = () => {
