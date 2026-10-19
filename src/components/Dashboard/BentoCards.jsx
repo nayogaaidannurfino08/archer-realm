@@ -4,7 +4,7 @@ import { mockBentoCards } from '../../data/mockBentoCards';
 
 export const BentoCards = ({ onNavigateTab }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5 mt-5">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 lg:gap-5 mt-4 sm:mt-5">
       {mockBentoCards.map((card) => {
         // Boss card has fantasy artwork banner
         if (card.isFantasyArt) {
@@ -15,7 +15,7 @@ export const BentoCards = ({ onNavigateTab }) => {
               role="button"
               tabIndex={0}
               onKeyDown={(e) => e.key === 'Enter' && onNavigateTab(card.targetTab)}
-              className="group relative overflow-hidden rounded-2xl min-h-[165px] md:min-h-[180px] p-5 md:p-6 border border-slate-700/60 transition-all duration-300 hover:border-amber-400/50 hover:shadow-[0_0_30px_rgba(245,158,11,0.2)] flex flex-col justify-between cursor-pointer select-none"
+              className="group relative overflow-hidden rounded-2xl min-h-[160px] md:min-h-[180px] p-4 sm:p-5 md:p-6 border border-slate-700/60 transition-all duration-300 hover:border-amber-400/50 hover:shadow-[0_0_30px_rgba(245,158,11,0.2)] flex flex-col justify-between cursor-pointer select-none"
             >
               {/* Background Fantasy Illustration */}
               <img 
@@ -62,7 +62,7 @@ export const BentoCards = ({ onNavigateTab }) => {
             role="button"
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && onNavigateTab(card.targetTab)}
-            className={`group relative overflow-hidden rounded-2xl min-h-[165px] md:min-h-[180px] p-5 md:p-6 border bg-gradient-to-br ${card.accentColor} ${card.borderColor} transition-all duration-300 flex flex-col justify-between cursor-pointer select-none`}
+            className={`group relative overflow-hidden rounded-2xl min-h-[160px] md:min-h-[180px] p-4 sm:p-5 md:p-6 border bg-gradient-to-br ${card.accentColor} ${card.borderColor} transition-all duration-300 flex flex-col justify-between cursor-pointer select-none`}
           >
             {/* Top Icon Badge */}
             <div className="flex items-center justify-between">

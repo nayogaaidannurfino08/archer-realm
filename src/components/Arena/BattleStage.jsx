@@ -14,12 +14,12 @@ const ArcherFigure = ({ activeCharacter = 'verdant', isDrawing = false, isHurt =
   return (
     <div className="relative flex flex-col items-center">
       {/* Floor Contact Shadow (Resting on arena ground) */}
-      <div className="absolute -bottom-1.5 w-16 h-3 bg-black/80 rounded-full blur-[2px] pointer-events-none" />
+      <div className="absolute -bottom-1 w-12 sm:w-16 h-2.5 bg-black/80 rounded-full blur-[2px] pointer-events-none" />
 
       {/* Standalone Vector Archer */}
       <svg
         viewBox="0 0 80 90"
-        className="w-18 h-22 sm:w-20 sm:h-24 overflow-visible"
+        className="w-14 h-18 sm:w-18 sm:h-22 overflow-visible"
         style={{ filter: `drop-shadow(0 0 10px ${accentGlow})` }}
       >
         {/* Flowing Cape */}
@@ -111,12 +111,12 @@ const DragonFigure = ({ isAttacking = false, isHit = false }) => {
   return (
     <div className="relative flex flex-col items-center">
       {/* Floor Contact Shadow (Resting on arena ground) */}
-      <div className="absolute -bottom-1.5 w-24 sm:w-28 h-3.5 bg-black/80 rounded-full blur-[2px] pointer-events-none" />
+      <div className="absolute -bottom-1 w-18 sm:w-26 h-2.5 sm:h-3.5 bg-black/80 rounded-full blur-[2px] pointer-events-none" />
 
       {/* Standalone Vector Wyvern Dragon */}
       <svg
         viewBox="0 0 110 100"
-        className="w-24 h-22 sm:w-30 sm:h-28 overflow-visible"
+        className="w-20 h-18 sm:w-28 sm:h-24 overflow-visible"
         style={{
           filter: isHit
             ? 'drop-shadow(0 0 25px rgba(244,63,94,0.9)) brightness(2) contrast(1.5)'
@@ -218,7 +218,7 @@ export const BattleStage = ({
   const isStorm = activeCharacter === 'storm';
 
   return (
-    <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#060b14] h-44 sm:h-56 shadow-2xl flex flex-col justify-between select-none">
+    <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#060b14] h-40 sm:h-48 shadow-2xl flex flex-col justify-between select-none">
       {/* 1. CLEAN MODERN DARK FANTASY FLAT BACKGROUND (NO REALISTIC IMAGE) */}
       {/* Gradient Night Sky */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#0b1325] via-[#070d18] to-[#040810]" />
@@ -267,7 +267,7 @@ export const BattleStage = ({
       </AnimatePresence>
 
       {/* 2. TOP HUD (Hearts, Round, Boss HP) */}
-      <div className="relative z-30 flex items-center justify-between px-3.5 sm:px-5 py-2">
+      <div className="relative z-30 flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
         {/* Left: Player Hearts */}
         <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-950/85 backdrop-blur-md border border-slate-800/80 shadow-md">
           {Array.from({ length: maxHearts }).map((_, index) => {

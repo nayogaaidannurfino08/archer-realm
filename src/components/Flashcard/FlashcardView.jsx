@@ -230,7 +230,7 @@ export const FlashcardView = ({ onBackToDashboard }) => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Left/Center: Card Duel Stage */}
-          <div className="lg:col-span-2 flex flex-col items-center justify-center p-4 sm:p-8 rounded-2xl bg-[#0f1828]/80 border border-slate-800/90 shadow-xl relative min-h-[460px]">
+          <div className="lg:col-span-2 flex flex-col items-center justify-center p-3 sm:p-8 rounded-2xl bg-[#0f1828]/80 border border-slate-800/90 shadow-xl relative min-h-[430px] sm:min-h-[460px]">
             {/* Interactive Flashcard Card */}
             <FlashcardCard 
               card={currentCard}
@@ -240,8 +240,8 @@ export const FlashcardView = ({ onBackToDashboard }) => {
               exitDirection={exitDirection}
             />
 
-            {/* Bottom Swipe Action Controls (Matches Screenshot exactly) */}
-            <div className="flex items-center gap-6 sm:gap-8 mt-5 relative z-10">
+            {/* Bottom Swipe Action Controls (Thumb-friendly on mobile) */}
+            <div className="flex items-center gap-6 sm:gap-10 mt-4 sm:mt-5 relative z-10">
               {/* Swipe Left Button (Red X) */}
               <div className="flex flex-col items-center">
                 <button 
@@ -249,11 +249,11 @@ export const FlashcardView = ({ onBackToDashboard }) => {
                   onClick={() => handleAnswer('left')}
                   disabled={showExplanation || isExiting}
                   aria-label="Swipe Kiri"
-                  className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-rose-500/20 border-2 border-rose-500/40 text-rose-400 hover:bg-rose-500 hover:text-white active:scale-95 transition-all shadow-lg flex items-center justify-center cursor-pointer disabled:opacity-50"
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-rose-500/20 border-2 border-rose-500/40 text-rose-400 hover:bg-rose-500 hover:text-white active:scale-95 transition-all shadow-lg flex items-center justify-center cursor-pointer disabled:opacity-50"
                 >
                   <X className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />
                 </button>
-                <span className="text-xs font-semibold text-slate-300 mt-2">
+                <span className="text-xs font-semibold text-slate-300 mt-1.5 sm:mt-2">
                   Swipe Kiri
                 </span>
                 <span className="text-[10px] text-slate-400">
@@ -270,11 +270,11 @@ export const FlashcardView = ({ onBackToDashboard }) => {
                   onClick={() => handleAnswer('right')}
                   disabled={showExplanation || isExiting}
                   aria-label="Swipe Kanan"
-                  className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 active:scale-95 transition-all shadow-lg flex items-center justify-center cursor-pointer disabled:opacity-50"
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 active:scale-95 transition-all shadow-lg flex items-center justify-center cursor-pointer disabled:opacity-50"
                 >
                   <Check className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />
                 </button>
-                <span className="text-xs font-semibold text-slate-300 mt-2">
+                <span className="text-xs font-semibold text-slate-300 mt-1.5 sm:mt-2">
                   Swipe Kanan
                 </span>
                 <span className="text-[10px] text-slate-400">

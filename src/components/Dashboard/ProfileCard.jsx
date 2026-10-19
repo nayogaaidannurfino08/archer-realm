@@ -42,7 +42,7 @@ const CharacterAvatar = ({ activeCharacter }) => {
 
 export const ProfileCard = ({ userData, activeCharacter, onSelectCharacter }) => {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-[#0f1828]/90 border border-slate-800/80 p-5 md:p-6 backdrop-blur flex flex-col justify-between shadow-lg">
+    <div className="relative overflow-hidden rounded-2xl bg-[#0f1828]/90 border border-slate-800/80 p-4 sm:p-5 md:p-6 backdrop-blur flex flex-col justify-between shadow-lg">
       {/* Background glow accent */}
       <div 
         className={`absolute -top-16 -left-16 w-44 h-44 rounded-full blur-3xl pointer-events-none transition-all duration-500 ${
@@ -51,46 +51,46 @@ export const ProfileCard = ({ userData, activeCharacter, onSelectCharacter }) =>
       />
 
       {/* Top Section: Avatar & Greeting */}
-      <div className="flex items-center gap-4 relative z-10">
+      <div className="flex items-center gap-3.5 sm:gap-4 relative z-10">
         <CharacterAvatar activeCharacter={activeCharacter} />
-        <div>
-          <h2 className="text-lg md:text-xl font-bold text-white tracking-tight flex items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight flex items-center gap-1.5 truncate">
             {userData?.greeting || 'Halo, Nayoga 👋'}
           </h2>
-          <p className="text-xs md:text-sm text-slate-400 mt-1">
+          <p className="text-xs md:text-sm text-slate-400 mt-0.5 line-clamp-1">
             {userData?.subgreeting || 'Siap menaklukkan TKA English hari ini?'}
           </p>
         </div>
       </div>
 
       {/* Bottom Section: Character Selector */}
-      <div className="mt-5 pt-4 border-t border-slate-800/60 flex flex-wrap items-center gap-2.5 relative z-10">
+      <div className="mt-4 pt-3.5 sm:mt-5 sm:pt-4 border-t border-slate-800/60 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2.5 relative z-10">
         {/* Verdant Scout Button */}
         <button
           type="button"
           onClick={() => onSelectCharacter('verdant')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+          className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer w-full sm:w-auto ${
             activeCharacter === 'verdant'
               ? 'bg-emerald-400 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:bg-emerald-300'
               : 'bg-slate-800/70 text-slate-400 border border-slate-700/60 hover:text-slate-200 hover:bg-slate-800'
           }`}
         >
-          <Leaf className={`w-3.5 h-3.5 ${activeCharacter === 'verdant' ? 'fill-current' : ''}`} />
-          <span>Verdant Scout</span>
+          <Leaf className={`w-3.5 h-3.5 shrink-0 ${activeCharacter === 'verdant' ? 'fill-current' : ''}`} />
+          <span className="truncate">Verdant Scout</span>
         </button>
 
         {/* Storm Scout Button */}
         <button
           type="button"
           onClick={() => onSelectCharacter('storm')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+          className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer w-full sm:w-auto ${
             activeCharacter === 'storm'
               ? 'bg-cyan-400 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:bg-cyan-300'
               : 'bg-slate-800/70 text-slate-400 border border-slate-700/60 hover:text-slate-200 hover:bg-slate-800'
           }`}
         >
-          <Zap className={`w-3.5 h-3.5 ${activeCharacter === 'storm' ? 'fill-current' : ''}`} />
-          <span>Storm Scout</span>
+          <Zap className={`w-3.5 h-3.5 shrink-0 ${activeCharacter === 'storm' ? 'fill-current' : ''}`} />
+          <span className="truncate">Storm Scout</span>
         </button>
       </div>
     </div>

@@ -152,34 +152,32 @@ export const UploaderView = ({ onNavigateTab }) => {
         /* Upload & Form Section */
         <div className="flex flex-col space-y-5">
           {/* Input Method Switcher Tabs */}
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-1">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab('file')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                  activeTab === 'file'
-                    ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
-                    : 'text-slate-400 hover:text-white bg-slate-900/60 hover:bg-slate-800'
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                <span>Drag & Drop File (PDF / Gambar)</span>
-              </button>
+          <div className="grid grid-cols-2 gap-2 w-full border-b border-slate-800/80 pb-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('file')}
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                activeTab === 'file'
+                  ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                  : 'text-slate-400 hover:text-white bg-slate-900/60 hover:bg-slate-800'
+              }`}
+            >
+              <FileText className="w-4 h-4 shrink-0" />
+              <span className="truncate">File (PDF / Gambar)</span>
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('text')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                  activeTab === 'text'
-                    ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
-                    : 'text-slate-400 hover:text-white bg-slate-900/60 hover:bg-slate-800'
-                }`}
-              >
-                <AlignLeft className="w-4 h-4" />
-                <span>Paste Teks Materi Langsung</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('text')}
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                activeTab === 'text'
+                  ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                  : 'text-slate-400 hover:text-white bg-slate-900/60 hover:bg-slate-800'
+              }`}
+            >
+              <AlignLeft className="w-4 h-4 shrink-0" />
+              <span className="truncate">Paste Teks Materi</span>
+            </button>
           </div>
 
           {/* Active Tab Panel */}
@@ -214,7 +212,7 @@ export const UploaderView = ({ onNavigateTab }) => {
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               {/* Optional Demo Mode Button for Instant Evaluation */}
               <button
                 type="button"

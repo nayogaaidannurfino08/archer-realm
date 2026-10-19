@@ -5,9 +5,9 @@ export const BottomNav = ({ activeTab, onSelectTab }) => {
   return (
     <nav 
       aria-label="Mobile Navigation"
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#080d17]/95 backdrop-blur-lg border-t border-slate-800/90 px-2 py-2 safe-bottom"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#080d17]/95 backdrop-blur-lg border-t border-slate-800/90 px-1 py-1.5 safe-bottom shadow-[0_-4px_25px_rgba(0,0,0,0.6)]"
     >
-      <div className="flex items-center justify-around">
+      <div className="flex items-center justify-between max-w-md mx-auto">
         {NAVIGATION_TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -17,18 +17,18 @@ export const BottomNav = ({ activeTab, onSelectTab }) => {
               key={tab.id}
               type="button"
               onClick={() => onSelectTab(tab.id)}
-              className={`flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-lg transition-all ${
+              className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 rounded-xl transition-all ${
                 isActive 
-                  ? 'text-emerald-400 font-semibold' 
+                  ? 'text-emerald-400 font-bold' 
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <div className={`p-1 rounded-lg transition-all ${
-                isActive ? 'bg-emerald-500/20 text-emerald-400' : ''
+                isActive ? 'bg-emerald-500/20 text-emerald-400 scale-105' : ''
               }`}>
-                <Icon className="w-5 h-5" />
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <span className="text-[10px] mt-1 tracking-tight truncate max-w-[65px]">
+              <span className="text-[9px] sm:text-[10px] mt-0.5 tracking-tight font-medium text-center leading-none">
                 {tab.label}
               </span>
             </button>

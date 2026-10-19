@@ -32,7 +32,7 @@ export const ProgressCard = ({ stats }) => {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-[#0f1828]/90 border border-slate-800/80 p-5 md:p-6 backdrop-blur flex flex-col justify-between shadow-lg">
+    <div className="relative overflow-hidden rounded-2xl bg-[#0f1828]/90 border border-slate-800/80 p-4 sm:p-5 md:p-6 backdrop-blur flex flex-col justify-between shadow-lg">
       {/* Top Header: Title & Percentage */}
       <div>
         <div className="flex items-center justify-between text-xs md:text-sm font-semibold mb-2.5">

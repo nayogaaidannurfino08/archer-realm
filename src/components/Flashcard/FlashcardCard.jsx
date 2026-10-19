@@ -19,8 +19,8 @@ export const FlashcardCard = ({
 
   const handleDragEnd = (event, info) => {
     if (disabled) return;
-    const swipeThreshold = 90;
-    const velocityThreshold = 400;
+    const swipeThreshold = 65;
+    const velocityThreshold = 250;
 
     if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
       onSwipe('right');
@@ -32,18 +32,18 @@ export const FlashcardCard = ({
   if (!card) return null;
 
   return (
-    <div className="relative w-full max-w-md h-[400px] flex items-center justify-center select-none">
+    <div className="relative w-full max-w-sm sm:max-w-md h-[370px] sm:h-[400px] flex items-center justify-center select-none">
       {/* Background Layer 2 (Deepest) */}
-      <div className="absolute top-4 w-[85%] h-[340px] rounded-2xl bg-[#0d1728]/70 border border-slate-800/70 shadow-lg -z-20 transform -translate-y-1 scale-95 opacity-50" />
+      <div className="absolute top-3 w-[85%] h-[320px] sm:h-[340px] rounded-2xl bg-[#0d1728]/70 border border-slate-800/70 shadow-lg -z-20 transform -translate-y-1 scale-95 opacity-50" />
 
       {/* Background Layer 1 (Middle) */}
-      <div className="absolute top-7 w-[92%] h-[350px] rounded-2xl bg-[#111e33]/80 border border-slate-700/60 shadow-xl -z-10 transform scale-[0.98] opacity-75" />
+      <div className="absolute top-6 w-[92%] h-[335px] sm:h-[350px] rounded-2xl bg-[#111e33]/80 border border-slate-700/60 shadow-xl -z-10 transform scale-[0.98] opacity-75" />
 
       {/* Main Active Swipeable Card */}
       <motion.div
         drag={disabled ? false : 'x'}
         dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.7}
+        dragElastic={0.6}
         onDragEnd={handleDragEnd}
         style={{ x, rotate }}
         animate={
@@ -57,7 +57,7 @@ export const FlashcardCard = ({
             : { x: 0, opacity: 1, rotate: 0 }
         }
         whileTap={{ cursor: 'grabbing' }}
-        className="w-full h-[375px] rounded-2xl bg-[#131f33] border border-slate-700/80 p-6 sm:p-7 shadow-2xl flex flex-col justify-between cursor-grab active:cursor-grabbing relative overflow-hidden backdrop-blur-md"
+        className="w-full h-[350px] sm:h-[375px] rounded-2xl bg-[#131f33] border border-slate-700/80 p-5 sm:p-7 shadow-2xl flex flex-col justify-between cursor-grab active:cursor-grabbing relative overflow-hidden backdrop-blur-md"
       >
         {/* Dynamic Drag Tint Overlays */}
         {/* Green tint for dragging right */}
