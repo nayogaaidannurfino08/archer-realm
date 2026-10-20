@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Swords, ArrowLeft, Heart, CheckCircle2, XCircle, Sparkles } from 'lucide-react';
+import { Swords, ArrowLeft, Heart, CheckCircle2, XCircle, Sparkles, Filter } from 'lucide-react';
 
 import { mockBossQuizzes } from '../../data/mockBossQuizzes';
 import { BattleStage } from './BattleStage';
@@ -22,34 +22,85 @@ import { shuffleArray } from '../../utils/shuffle';
 import { fetchCustomBossQuizzes } from '../../services/supabaseClient';
 
 export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard, onNavigateTab }) => {
-  // Helper to load and dynamically shuffle the quizzes (Fisher-Yates)
-  const getShuffledQuizzes = useCallback((customList = null) => {
+  // Helper to load combined master quizzes
+  const getCombinedMasterQuizzes = useCallback((customList = null) => {
     const customQuizzes = customList || getStoredItem(STORAGE_KEYS.CUSTOM_BOSS_QUIZZES, []);
     let combined = [...mockBossQuizzes];
     if (customQuizzes && customQuizzes.length > 0) {
       const uniqueCustom = customQuizzes.filter((c) => !mockBossQuizzes.some((m) => m.id === c.id));
       combined = [...uniqueCustom, ...mockBossQuizzes];
     }
-    return shuffleArray(combined);
+    return combined;
   }, []);
 
-  // Quizzes Queue State: dynamic Fisher-Yates randomized queue
-  const [quizzes, setQuizzes] = useState(getShuffledQuizzes);
+  // Master quizzes state
+  const [allQuizzes, setAllQuizzes] = useState(getCombinedMasterQuizzes);
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+
+  // Extract distinct categories
+  const categories = useMemo(() => {
+    const cats = new Set();
+    allQuizzes.forEach((q) => {
+      const cat = (q.category || '').trim();
+      if (cat) cats.add(cat);
+    });
+    return Array.from(cats);
+  }, [allQuizzes]);
+
+  // Quizzes Queue State: filtered and dynamically Fisher-Yates randomized
+  const [quizzes, setQuizzes] = useState(() => shuffleArray(getCombinedMasterQuizzes()));
   const totalQuizzes = quizzes.length;
+
+  // Active timers ref for clean bulletproof resets
+  const timerRefs = useRef([]);
+  const addTimeout = (fn, delay) => {
+    const id = setTimeout(fn, delay);
+    timerRefs.current.push(id);
+    return id;
+  };
+  const clearAllTimeouts = useCallback(() => {
+    timerRefs.current.forEach((id) => clearTimeout(id));
+    timerRefs.current = [];
+  }, []);
+
+  useEffect(() => {
+    return () => clearAllTimeouts();
+  }, [clearAllTimeouts]);
+
+  // Helper to apply category filter and fresh Fisher-Yates shuffle
+  const applyFilterAndShuffle = useCallback((cat, quizList = allQuizzes) => {
+    clearAllTimeouts();
+    let filtered = quizList;
+    if (cat !== 'ALL') {
+      filtered = quizList.filter((q) => (q.category || '').toLowerCase() === cat.toLowerCase());
+    }
+    const shuffled = shuffleArray(filtered);
+    setQuizzes(shuffled);
+    setCurrentIndex(0);
+    setPlayerHearts(3);
+    setBossHp(100);
+    setCombatState('idle');
+    setIsFlickering(false);
+    setShowExplanation(false);
+    setWrongQuizData(null);
+    setGameStatus('playing');
+    setSelectedOption(null);
+  }, [allQuizzes, clearAllTimeouts]);
 
   // Sync from Supabase on mount with local mock fallback
   useEffect(() => {
     let isMounted = true;
     fetchCustomBossQuizzes().then((remoteQuizzes) => {
       if (isMounted && remoteQuizzes && remoteQuizzes.length > 0) {
-        const freshQuizzes = getShuffledQuizzes(remoteQuizzes);
-        setQuizzes(freshQuizzes);
+        const freshCombined = getCombinedMasterQuizzes(remoteQuizzes);
+        setAllQuizzes(freshCombined);
+        applyFilterAndShuffle(selectedCategory, freshCombined);
       }
     });
     return () => {
       isMounted = false;
     };
-  }, [getShuffledQuizzes]);
+  }, [getCombinedMasterQuizzes, applyFilterAndShuffle, selectedCategory]);
 
   // Game States
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -62,38 +113,18 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard, 
   const [gameStatus, setGameStatus] = useState('playing'); // 'playing' | 'victory' | 'game_over'
   const [selectedOption, setSelectedOption] = useState(null);
 
-  // Active timers ref for clean bulletproof resets
-  const timerRefs = useRef([]);
-  const addTimeout = (fn, delay) => {
-    const id = setTimeout(fn, delay);
-    timerRefs.current.push(id);
-    return id;
-  };
-  const clearAllTimeouts = () => {
-    timerRefs.current.forEach((id) => clearTimeout(id));
-    timerRefs.current = [];
-  };
-
-  useEffect(() => {
-    return () => clearAllTimeouts();
-  }, []);
-
   const currentQuiz = quizzes[currentIndex] || null;
 
-  // Restart Handler (Dynamic Re-shuffle)
+  // Restart Handler (Dynamic Re-shuffle with active category filter)
   const handleRestart = () => {
-    clearAllTimeouts();
-    const freshQuizzes = getShuffledQuizzes();
-    setQuizzes(freshQuizzes);
-    setCurrentIndex(0);
-    setPlayerHearts(3);
-    setBossHp(100);
-    setCombatState('idle');
-    setIsFlickering(false);
-    setShowExplanation(false);
-    setWrongQuizData(null);
-    setGameStatus('playing');
-    setSelectedOption(null);
+    applyFilterAndShuffle(selectedCategory, allQuizzes);
+  };
+
+  // Handle Category Filter Change
+  const handleCategoryChange = (e) => {
+    const newCat = e.target.value;
+    setSelectedCategory(newCat);
+    applyFilterAndShuffle(newCat, allQuizzes);
   };
 
   // Answer Submission Handler
@@ -218,8 +249,8 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard, 
 
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col space-y-3.5 sm:space-y-4 animate-fadeIn select-none">
-      {/* 1. Header Navigation (Compact) */}
-      <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
+      {/* 1. Header Navigation & Chapter Filter */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-800/80">
         <div className="flex items-center gap-2.5">
           <button
             type="button"
@@ -242,16 +273,39 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard, 
           </div>
         </div>
 
-        {/* Hearts Indicator */}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 shadow">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Heart
-              key={i}
-              className={`w-4 h-4 transition-colors ${
-                i < playerHearts ? 'text-rose-500 fill-rose-500' : 'text-slate-700 fill-slate-800'
-              }`}
-            />
-          ))}
+        {/* Right Section: Chapter Filter Dropdown & Hearts Indicator */}
+        <div className="flex items-center justify-between sm:justify-end gap-2.5">
+          {/* Chapter Filter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 rounded-xl px-2.5 py-1.5 shadow-sm text-xs">
+            <Filter className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <select
+              value={selectedCategory}
+              onChange={handleCategoryChange}
+              aria-label="Filter Bab / Modul"
+              className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer pr-1 max-w-[150px] sm:max-w-[190px] truncate"
+            >
+              <option value="ALL" className="bg-slate-900 text-white">
+                Semua Bab (Campur)
+              </option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat} className="bg-slate-900 text-white">
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Hearts Indicator */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 shadow">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Heart
+                key={i}
+                className={`w-4 h-4 transition-colors ${
+                  i < playerHearts ? 'text-rose-500 fill-rose-500' : 'text-slate-700 fill-slate-800'
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
@@ -262,18 +316,36 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard, 
             <Swords className="w-8 h-8" />
           </div>
           <div className="max-w-md">
-            <h3 className="text-lg font-bold text-white">Belum Ada Soal Boss Arena</h3>
+            <h3 className="text-lg font-bold text-white">
+              {selectedCategory !== 'ALL' ? `Tidak Ada Soal untuk "${selectedCategory}"` : 'Belum Ada Soal Boss Arena'}
+            </h3>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Data soal bawaan telah dikosongkan. Unggah dokumen latihan atau catatan materi TKA di menu Uploader untuk menghasilkan tantangan Boss Arena baru dengan AI.
+              {selectedCategory !== 'ALL'
+                ? 'Tidak ditemukan soal untuk bab ini. Anda dapat beralih ke "Semua Bab (Campur)" atau mengunggah materi baru untuk bab ini.'
+                : 'Data soal bawaan telah dikosongkan. Unggah dokumen latihan atau catatan materi TKA di menu Uploader untuk menghasilkan tantangan Boss Arena baru dengan AI.'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => (onNavigateTab ? onNavigateTab('uploader') : onBackToDashboard())}
-            className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-lg active:scale-95 cursor-pointer"
-          >
-            Buka Menu Uploader
-          </button>
+          <div className="flex items-center gap-3">
+            {selectedCategory !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory('ALL');
+                  applyFilterAndShuffle('ALL', allQuizzes);
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition-all cursor-pointer"
+              >
+                Tampilkan Semua Bab
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => (onNavigateTab ? onNavigateTab('uploader') : onBackToDashboard())}
+              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-lg active:scale-95 cursor-pointer"
+            >
+              Buka Menu Uploader
+            </button>
+          </div>
         </div>
       ) : gameStatus === 'victory' ? (
         <BossVictoryScreen

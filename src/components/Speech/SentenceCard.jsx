@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Volume2, VolumeX, Sparkles, Mic } from 'lucide-react';
 import { speakSentence } from '../../utils/speech';
 
-export const SentenceCard = ({ sentenceData, liveTranscript = '' }) => {
+export const SentenceCard = ({ sentenceData, liveTranscript = '', speechLang = 'en-US' }) => {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   const handlePlayAudio = () => {
@@ -17,7 +17,7 @@ export const SentenceCard = ({ sentenceData, liveTranscript = '' }) => {
     setIsPlayingAudio(true);
     speakSentence(sentenceData.sentence, () => {
       setIsPlayingAudio(false);
-    });
+    }, speechLang);
   };
 
   return (

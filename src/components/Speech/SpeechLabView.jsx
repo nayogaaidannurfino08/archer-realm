@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Activity, ArrowLeft, AlertCircle, Award, RotateCcw, Plus, Sparkles } from 'lucide-react';
+import { Mic, Activity, ArrowLeft, AlertCircle, Award, RotateCcw, Plus, Sparkles, Globe } from 'lucide-react';
 
 import { mockSpeechSentences } from '../../data/mockSpeechSentences';
 import { SentenceCard } from './SentenceCard';
@@ -9,7 +9,8 @@ import { SpeechResultsCard } from './SpeechResultsCard';
 import { 
   createSpeechRecognition, 
   isSpeechRecognitionSupported, 
-  evaluatePronunciation 
+  evaluatePronunciation,
+  extractCleanTranscript 
 } from '../../utils/speech';
 import { playSuccessSound, playVictoryFanfare } from '../../utils/audio';
 import { getStoredItem, setStoredItem, STORAGE_KEYS } from '../../utils/storage';
@@ -25,6 +26,7 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
+  const [speechLang, setSpeechLang] = useState('en-US'); // 'en-US' | 'en-GB' | 'id-ID'
   const [results, setResults] = useState(null);
   const [micError, setMicError] = useState(null);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -105,11 +107,11 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
     finalTranscriptRef.current = '';
     latestSpokenRef.current = '';
 
-    const recognition = createSpeechRecognition();
+    const recognition = createSpeechRecognition(speechLang);
     if (!recognition) return;
 
     // Explicit configurations: continuous listening with real-time stream
-    recognition.lang = 'en-US';
+    recognition.lang = speechLang;
     recognition.continuous = true; // DO NOT auto-stop; stay active until user stops
     recognition.interimResults = true; // Stream words in real-time as spoken
     recognition.maxAlternatives = 1;
@@ -122,23 +124,11 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
     };
 
     recognition.onresult = (event) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
-
-      // Standard Web Speech API parsing: separates finalized results from interim stream
-      for (let i = 0; i < event.results.length; ++i) {
-        const item = event.results[i];
-        if (item.isFinal) {
-          finalTranscript += item[0].transcript + ' ';
-        } else {
-          interimTranscript += item[0].transcript;
-        }
-      }
-
-      finalTranscriptRef.current = finalTranscript.trim();
-      const currentLive = (finalTranscript + interimTranscript).trim();
-      latestSpokenRef.current = currentLive;
-      setLiveTranscript(currentLive);
+      // Mobile-friendly non-duplicating transcript processor
+      const cleanStream = extractCleanTranscript(event.results);
+      finalTranscriptRef.current = cleanStream;
+      latestSpokenRef.current = cleanStream;
+      setLiveTranscript(cleanStream);
     };
 
     recognition.onerror = (event) => {
@@ -158,7 +148,7 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
     recognition.onend = () => {
       setIsRecording(false);
 
-      const transcriptToAnalyze = (latestSpokenRef.current || finalTranscriptRef.current).trim();
+      const transcriptToAnalyze = (latestSpokenRef.current || finalTranscriptRef.current || '').trim();
 
       if (transcriptToAnalyze && currentSentence) {
         // Fast processing (< 300ms)
@@ -177,7 +167,7 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
             if (currentStats && currentStats.metrics) {
               const vocabMetric = currentStats.metrics.find((m) => m.id === 'vocabulary');
               if (vocabMetric) {
-                const parts = vocabMetric.value.split('/');
+                const parts = (vocabMetric.value || '0/1200').split('/');
                 const parsedCount = parseInt(parts[0], 10);
                 const currentCount = isNaN(parsedCount) ? 0 : parsedCount;
                 const totalCount = parseInt(parts[1], 10) || 1200;
@@ -257,8 +247,23 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
           </div>
         </div>
 
-        {/* Right Badges & Add Sentence Button */}
-        <div className="flex items-center gap-2">
+        {/* Right Badges, Accent Selector & Add Sentence Button */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Accent / Speech Recognition Language Selector */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700/80 text-xs shadow-sm">
+            <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <select
+              value={speechLang}
+              onChange={(e) => setSpeechLang(e.target.value)}
+              aria-label="Pilih Aksen Bahasa"
+              className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="en-US" className="bg-slate-900 text-white">English (US)</option>
+              <option value="en-GB" className="bg-slate-900 text-white">English (UK)</option>
+              <option value="id-ID" className="bg-slate-900 text-white">Indonesia (Bilingual)</option>
+            </select>
+          </div>
+
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
@@ -372,6 +377,7 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
             <SentenceCard
               sentenceData={currentSentence}
               liveTranscript={liveTranscript}
+              speechLang={speechLang}
             />
 
             {/* Visualizer & Quick Record Section (100% Manual Toggle) */}

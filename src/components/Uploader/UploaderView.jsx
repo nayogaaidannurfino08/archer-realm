@@ -7,8 +7,10 @@ import {
   Loader2, 
   AlertCircle, 
   CheckCircle2, 
-  Zap,
-  ArrowRight
+  Tag,
+  Database,
+  Layers,
+  Swords
 } from 'lucide-react';
 
 import { ApiKeyBanner } from './ApiKeyBanner';
@@ -16,6 +18,7 @@ import { UploadZone } from './UploadZone';
 import { PasteTextZone } from './PasteTextZone';
 import { GuidanceCard } from './GuidanceCard';
 import { GeneratedPreview } from './GeneratedPreview';
+import { QuestionBankManager } from './QuestionBankManager';
 
 import { 
   parseMaterialWithGemini, 
@@ -29,10 +32,14 @@ import {
 import { playSuccessSound, playErrorSound } from '../../utils/audio';
 
 export const UploaderView = ({ onNavigateTab }) => {
+  // Navigation Section: 'upload' | 'manager'
+  const [activeSection, setActiveSection] = useState('upload');
+
   // Input Method: 'file' | 'text'
   const [activeTab, setActiveTab] = useState('file');
 
   // Input States
+  const [moduleName, setModuleName] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [pastedText, setPastedText] = useState('');
 
@@ -41,6 +48,7 @@ export const UploaderView = ({ onNavigateTab }) => {
   const [progressStep, setProgressStep] = useState('');
   const [errorMessage, setErrorMessage] = useState(null);
   const [parsedResult, setParsedResult] = useState(null);
+  const [bankRefreshKey, setBankRefreshKey] = useState(0);
 
   const isFormValid = activeTab === 'file' ? Boolean(selectedFile) : pastedText.trim().length >= 10;
 
@@ -52,41 +60,47 @@ export const UploaderView = ({ onNavigateTab }) => {
     setIsParsing(true);
     setProgressStep('Membaca dan memverifikasi materi input...');
 
+    const trimmedModuleName = moduleName.trim();
+
     try {
       const isKeyAvailable = hasGeminiApiKey();
 
       // If user forces mock OR no key is configured, run demo mock
       if (forceMock || !isKeyAvailable) {
-        setProgressStep('Menjalankan Gemini 1.5 Flash Parser (Demo Mode)...');
+        setProgressStep('Menjalankan Gemini 1.5 Flash Parser (Demo Mode 20+ Soal)...');
         const mockResult = await parseMaterialWithMock({
           textContent: pastedText,
           file: selectedFile,
+          moduleName: trimmedModuleName,
         });
-        setProgressStep('Menyimpan ke Supabase & LocalStorage...');
+        setProgressStep('Menyimpan ke Supabase & LocalStorage (Sistem Append)...');
         await Promise.all([
           syncFlashcardsToSupabase(mockResult.flashcards),
           syncBossQuizzesToSupabase(mockResult.bossQuizzes),
         ]);
         setParsedResult(mockResult);
+        setBankRefreshKey((k) => k + 1);
         playSuccessSound();
         setIsParsing(false);
         return;
       }
 
       // Live Gemini 1.5 Flash Call
-      setProgressStep('Mengirim materi ke Google Gemini 1.5 Flash...');
+      setProgressStep('Mengirim materi ke Google Gemini 1.5 Flash (Target 20-25 Soal)...');
       const result = await parseMaterialWithGemini({
         textContent: activeTab === 'text' ? pastedText : '',
         file: activeTab === 'file' ? selectedFile : null,
+        moduleName: trimmedModuleName,
       });
 
-      setProgressStep('Menyinkronkan hasil ke Supabase Cloud...');
+      setProgressStep('Menyinkronkan hasil ke Supabase Cloud & LocalStorage...');
       await Promise.all([
         syncFlashcardsToSupabase(result.flashcards),
         syncBossQuizzesToSupabase(result.bossQuizzes),
       ]);
 
       setParsedResult(result);
+      setBankRefreshKey((k) => k + 1);
       playSuccessSound();
     } catch (err) {
       console.error('Parsing error:', err);
@@ -105,6 +119,7 @@ export const UploaderView = ({ onNavigateTab }) => {
     setErrorMessage(null);
     setSelectedFile(null);
     setPastedText('');
+    setModuleName('');
   };
 
   return (
@@ -122,27 +137,55 @@ export const UploaderView = ({ onNavigateTab }) => {
               </h2>
               <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
                 <Sparkles className="w-3 h-3 text-cyan-400" />
-                Powered by Google Gemini Free Tier
+                Gemini 1.5 Flash (Kuota 20-25 Soal)
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-              Ekstraksi otomatis dokumen/catatan menjadi Flashcard Duel (Confusion Words) & Boss Arena Battles.
+              Ekstraksi materi otomatis menjadi Flashcard Duel (Confusion Words) & Boss Arena Battles.
             </p>
           </div>
         </div>
 
-        {/* Mobile-only badge */}
-        <div className="sm:hidden flex items-center gap-1.5 self-start px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-          <Sparkles className="w-3 h-3 text-cyan-400" />
-          <span>Powered by Gemini 1.5 Flash</span>
+        {/* Section Switcher Tabs */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900 border border-slate-800 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setActiveSection('upload')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              activeSection === 'upload'
+                ? 'bg-cyan-500 text-slate-950 shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <CloudUpload className="w-3.5 h-3.5" />
+            <span>Upload Materi</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection('manager')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              activeSection === 'manager'
+                ? 'bg-cyan-500 text-slate-950 shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>Kelola Bank Soal</span>
+          </button>
         </div>
       </div>
 
       {/* 2. API Key Configuration & Status Banner */}
       <ApiKeyBanner />
 
-      {/* 3. Result Preview Area (When Available) */}
-      {parsedResult ? (
+      {/* 3. Main Body: Upload & Form OR Bank Manager */}
+      {activeSection === 'manager' ? (
+        <QuestionBankManager 
+          key={bankRefreshKey} 
+          onDataChanged={() => setBankRefreshKey((k) => k + 1)} 
+        />
+      ) : parsedResult ? (
+        /* Result Preview Area (When Available) */
         <GeneratedPreview 
           parsedResult={parsedResult} 
           onNavigateTab={onNavigateTab}
@@ -151,6 +194,30 @@ export const UploaderView = ({ onNavigateTab }) => {
       ) : (
         /* Upload & Form Section */
         <div className="flex flex-col space-y-5">
+          {/* Tag Bab / Modul Input */}
+          <div className="flex flex-col space-y-1.5 p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <div className="flex items-center justify-between">
+              <label htmlFor="moduleNameInput" className="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                <Tag className="w-4 h-4 text-cyan-400" />
+                <span>Nama Bab / Modul Materi (Opsional):</span>
+              </label>
+              <span className="text-[11px] text-cyan-400 font-medium hidden sm:inline">
+                Contoh: Bab 1: Subjunctive, Bab 2: Inversion
+              </span>
+            </div>
+            <input
+              id="moduleNameInput"
+              type="text"
+              value={moduleName}
+              onChange={(e) => setModuleName(e.target.value)}
+              placeholder="Masukkan nama bab (misal: Bab 1: Subjunctive Mood, Bab 2: Inversion)"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700/80 text-white placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:border-cyan-400 transition"
+            />
+            <p className="text-[11px] text-slate-400">
+              * Tag ini disimpan ke kolom <code className="text-cyan-300">category</code> di database Supabase dan LocalStorage. Soal baru otomatis digabungkan (*append*) tanpa menimpa bab yang sudah ada.
+            </p>
+          </div>
+
           {/* Input Method Switcher Tabs */}
           <div className="grid grid-cols-2 gap-2 w-full border-b border-slate-800/80 pb-2">
             <button
@@ -207,7 +274,7 @@ export const UploaderView = ({ onNavigateTab }) => {
               {isFormValid && (
                 <span className="text-emerald-400 flex items-center gap-1.5 font-medium">
                   <CheckCircle2 className="w-4 h-4" />
-                  Materi siap diolah dengan AI.
+                  Materi siap diolah menjadi minimal 20-25 pasang Flashcard & Boss Quizzes.
                 </span>
               )}
             </div>
@@ -220,7 +287,7 @@ export const UploaderView = ({ onNavigateTab }) => {
                 disabled={isParsing || !isFormValid}
                 className="px-3.5 py-3 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 transition-all disabled:opacity-40"
               >
-                Mode Demo (Cepat)
+                Mode Demo (20+ Soal)
               </button>
 
               {/* Primary Generate Button */}
@@ -242,7 +309,7 @@ export const UploaderView = ({ onNavigateTab }) => {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>Analisis & Generate Soal</span>
+                    <span>Generate 20-25 Soal AI</span>
                   </>
                 )}
               </button>
@@ -262,12 +329,20 @@ export const UploaderView = ({ onNavigateTab }) => {
                     onClick={() => handleStartParsing(true)}
                     className="px-3 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-[11px] font-bold text-white transition-all"
                   >
-                    Coba Mode Demo (Tanpa API Key)
+                    Coba Mode Demo (20+ Soal Tanpa API Key)
                   </button>
                 </div>
               </div>
             </div>
           )}
+
+          {/* Question Bank Manager Section at Bottom */}
+          <div className="pt-5 border-t border-slate-800/80">
+            <QuestionBankManager 
+              key={bankRefreshKey} 
+              onDataChanged={() => setBankRefreshKey((k) => k + 1)} 
+            />
+          </div>
 
           {/* Guidance Cards */}
           <div className="pt-4 border-t border-slate-800/80">

@@ -187,3 +187,90 @@ export const fetchCustomBossQuizzes = async () => {
 
   return getStoredItem(STORAGE_KEYS.CUSTOM_BOSS_QUIZZES, []);
 };
+
+// 6. Delete Questions by Specific Category (Supabase & LocalStorage)
+export const deleteCategoryFromSupabase = async (category) => {
+  if (!category) return { success: false, error: 'Category is required' };
+
+  // 1. Remove from LocalStorage
+  const localFc = getStoredItem(STORAGE_KEYS.CUSTOM_FLASHCARDS, []);
+  const updatedFc = localFc.filter((c) => c.category !== category);
+  setStoredItem(STORAGE_KEYS.CUSTOM_FLASHCARDS, updatedFc);
+
+  const localBq = getStoredItem(STORAGE_KEYS.CUSTOM_BOSS_QUIZZES, []);
+  const updatedBq = localBq.filter((q) => q.category !== category);
+  setStoredItem(STORAGE_KEYS.CUSTOM_BOSS_QUIZZES, updatedBq);
+
+  // 2. Remove from Supabase if configured
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        await Promise.all([
+          supabase.from('flashcards').delete().eq('category', category),
+          supabase.from('boss_quizzes').delete().eq('category', category),
+        ]);
+      }
+    } catch (err) {
+      console.warn('Failed deleting category from Supabase:', err);
+    }
+  }
+
+  return { success: true };
+};
+
+// 7. Reset All Custom Question Banks (Supabase & LocalStorage)
+export const resetAllQuestionBanks = async () => {
+  // 1. Clear LocalStorage custom questions
+  setStoredItem(STORAGE_KEYS.CUSTOM_FLASHCARDS, []);
+  setStoredItem(STORAGE_KEYS.CUSTOM_BOSS_QUIZZES, []);
+
+  // 2. Clear Supabase tables
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        await Promise.all([
+          supabase.from('flashcards').delete().neq('id', '___non_existent___'),
+          supabase.from('boss_quizzes').delete().neq('id', '___non_existent___'),
+        ]);
+      }
+    } catch (err) {
+      console.warn('Failed resetting Supabase tables:', err);
+    }
+  }
+
+  return { success: true };
+};
+
+// 8. Fetch Summary of All Question Categories with Counts
+export const fetchQuestionBankSummary = async () => {
+  const [flashcards, bossQuizzes] = await Promise.all([
+    fetchCustomFlashcards(),
+    fetchCustomBossQuizzes(),
+  ]);
+
+  const categoryMap = new Map();
+
+  flashcards.forEach((fc) => {
+    const cat = fc.category || 'Tanpa Kategori';
+    if (!categoryMap.has(cat)) {
+      categoryMap.set(cat, { category: cat, flashcardsCount: 0, bossQuizzesCount: 0, totalCount: 0 });
+    }
+    const item = categoryMap.get(cat);
+    item.flashcardsCount += 1;
+    item.totalCount += 1;
+  });
+
+  bossQuizzes.forEach((bq) => {
+    const cat = bq.category || 'Tanpa Kategori';
+    if (!categoryMap.has(cat)) {
+      categoryMap.set(cat, { category: cat, flashcardsCount: 0, bossQuizzesCount: 0, totalCount: 0 });
+    }
+    const item = categoryMap.get(cat);
+    item.bossQuizzesCount += 1;
+    item.totalCount += 1;
+  });
+
+  return Array.from(categoryMap.values()).sort((a, b) => b.totalCount - a.totalCount);
+};

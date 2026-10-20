@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ArrowLeft, Check, X, Sparkles, Layers } from 'lucide-react';
+import { ArrowLeft, Check, X, Sparkles, Layers, Filter } from 'lucide-react';
 
 import { mockFlashcards } from '../../data/mockFlashcards';
 import { FlashcardCard } from './FlashcardCard';
@@ -13,35 +13,76 @@ import { shuffleArray } from '../../utils/shuffle';
 import { fetchCustomFlashcards } from '../../services/supabaseClient';
 
 export const FlashcardView = ({ onBackToDashboard, onNavigateTab }) => {
-  // Helper to load and dynamically shuffle the deck (Fisher-Yates)
-  const getShuffledCards = useCallback((customList = null) => {
+  // Helper to load combined master cards
+  const getCombinedMasterCards = useCallback((customList = null) => {
     const customCards = customList || getStoredItem(STORAGE_KEYS.CUSTOM_FLASHCARDS, []);
     let combined = [...mockFlashcards];
     if (customCards && customCards.length > 0) {
       const uniqueCustom = customCards.filter((c) => !mockFlashcards.some((m) => m.id === c.id));
       combined = [...uniqueCustom, ...mockFlashcards];
     }
-    return shuffleArray(combined);
+    return combined;
   }, []);
 
-  // Deck Queue State: dynamic Fisher-Yates randomized queue
-  const [deck, setDeck] = useState(getShuffledCards);
+  // Master allCards state
+  const [allCards, setAllCards] = useState(getCombinedMasterCards);
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+
+  // Extract distinct categories
+  const categories = useMemo(() => {
+    const cats = new Set();
+    allCards.forEach((c) => {
+      const cat = (c.category || '').trim();
+      if (cat) cats.add(cat);
+    });
+    return Array.from(cats);
+  }, [allCards]);
+
+  // Deck Queue State: filtered and dynamically Fisher-Yates randomized
+  const [deck, setDeck] = useState(() => shuffleArray(getCombinedMasterCards()));
   const [totalCardsCount, setTotalCardsCount] = useState(() => deck.length);
+
+  // Helper to apply category filter and fresh Fisher-Yates shuffle
+  const applyFilterAndShuffle = useCallback((cat, cards = allCards) => {
+    let filtered = cards;
+    if (cat !== 'ALL') {
+      filtered = cards.filter((c) => (c.category || '').toLowerCase() === cat.toLowerCase());
+    }
+    const shuffled = shuffleArray(filtered);
+    setDeck(shuffled);
+    setTotalCardsCount(shuffled.length);
+    setMissedCardIds(new Set());
+    setSessionStats({
+      firstTryCorrect: 0,
+      repeatedCount: 0,
+      completedCards: 0,
+      totalCards: shuffled.length,
+    });
+    setShowExplanation(false);
+    setWrongCardData(null);
+  }, [allCards]);
 
   // Sync from Supabase on mount with local mock fallback
   useEffect(() => {
     let isMounted = true;
     fetchCustomFlashcards().then((remoteCards) => {
       if (isMounted && remoteCards && remoteCards.length > 0) {
-        const freshDeck = getShuffledCards(remoteCards);
-        setDeck(freshDeck);
-        setTotalCardsCount(freshDeck.length);
+        const freshCombined = getCombinedMasterCards(remoteCards);
+        setAllCards(freshCombined);
+        applyFilterAndShuffle(selectedCategory, freshCombined);
       }
     });
     return () => {
       isMounted = false;
     };
-  }, [getShuffledCards]);
+  }, [getCombinedMasterCards, applyFilterAndShuffle, selectedCategory]);
+
+  // Handle Category Filter Change
+  const handleCategoryChange = (e) => {
+    const newCat = e.target.value;
+    setSelectedCategory(newCat);
+    applyFilterAndShuffle(newCat, allCards);
+  };
 
   // Active Card & Animation State
   const [isExiting, setIsExiting] = useState(false);
@@ -91,6 +132,7 @@ export const FlashcardView = ({ onBackToDashboard, onNavigateTab }) => {
         if (currentStats && currentStats.metrics) {
           const vocabMetric = currentStats.metrics.find((m) => m.id === 'vocabulary');
           if (vocabMetric) {
+            const parts = (vocabMetric.value || '0 / 1200').split('/');
             const parsedCount = parseInt(parts[0], 10);
             const currentCount = isNaN(parsedCount) ? 0 : parsedCount;
             const totalCount = parseInt(parts[1], 10) || 1200;
@@ -158,32 +200,20 @@ export const FlashcardView = ({ onBackToDashboard, onNavigateTab }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleAnswer, showExplanation]);
 
-  // Restart Deck (Dynamic Re-shuffle)
+  // Restart Deck (Dynamic Re-shuffle with active category filter)
   const handleRestart = () => {
-    const freshShuffled = getShuffledCards();
-    setDeck(freshShuffled);
-    setTotalCardsCount(freshShuffled.length);
-    setMissedCardIds(new Set());
-    setSessionStats({
-      firstTryCorrect: 0,
-      repeatedCount: 0,
-      completedCards: 0,
-      totalCards: freshShuffled.length,
-    });
-    setShowExplanation(false);
-    setWrongCardData(null);
+    applyFilterAndShuffle(selectedCategory, allCards);
   };
 
   // Calculate Progress Percent
-  const progressPercent = Math.min(
-    100,
-    Math.round((sessionStats.completedCards / totalCardsCount) * 100)
-  );
+  const progressPercent = totalCardsCount > 0 
+    ? Math.min(100, Math.round((sessionStats.completedCards / totalCardsCount) * 100))
+    : 0;
 
   return (
     <div className="w-full flex flex-col space-y-5 animate-fadeIn select-none">
-      {/* 1. Header Navigation & Progress Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-800/80">
+      {/* 1. Header Navigation, Chapter Filter & Progress Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 pb-3 border-b border-slate-800/80">
         <div className="flex items-center gap-3">
           <button 
             type="button"
@@ -206,17 +236,40 @@ export const FlashcardView = ({ onBackToDashboard, onNavigateTab }) => {
           </div>
         </div>
 
-        {/* Progress Bar & Counter (Matches Screenshot 12 / 20 style) */}
-        <div className="flex items-center gap-3.5 w-full sm:w-56">
-          <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden relative">
-            <div 
-              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-              style={{ width: `${progressPercent}%` }}
-            />
+        {/* Right Section: Chapter Filter Dropdown & Progress Bar */}
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3.5 w-full md:w-auto">
+          {/* Chapter Filter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 rounded-xl px-2.5 py-1.5 shadow-sm text-xs">
+            <Filter className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <select
+              value={selectedCategory}
+              onChange={handleCategoryChange}
+              aria-label="Filter Bab / Modul"
+              className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer pr-1 max-w-[150px] sm:max-w-[190px] truncate"
+            >
+              <option value="ALL" className="bg-slate-900 text-white">
+                Semua Bab (Campur)
+              </option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat} className="bg-slate-900 text-white">
+                  {cat}
+                </option>
+              ))}
+            </select>
           </div>
-          <span className="text-xs font-bold text-slate-300 shrink-0 font-mono">
-            {sessionStats.completedCards} / {totalCardsCount}
-          </span>
+
+          {/* Progress Bar & Counter (Matches Screenshot 12 / 20 style) */}
+          <div className="flex items-center gap-2.5 flex-1 md:w-48">
+            <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden relative">
+              <div 
+                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <span className="text-xs font-bold text-slate-300 shrink-0 font-mono">
+              {sessionStats.completedCards} / {totalCardsCount}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -227,18 +280,36 @@ export const FlashcardView = ({ onBackToDashboard, onNavigateTab }) => {
             <Layers className="w-8 h-8" />
           </div>
           <div className="max-w-md">
-            <h3 className="text-lg font-bold text-white">Belum Ada Kartu Flashcard</h3>
+            <h3 className="text-lg font-bold text-white">
+              {selectedCategory !== 'ALL' ? `Tidak Ada Kartu untuk "${selectedCategory}"` : 'Belum Ada Kartu Flashcard'}
+            </h3>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Data kartu bawaan telah dikosongkan. Unggah dokumen latihan atau catatan materi TKA di menu Uploader untuk membuat Flashcard baru dengan AI.
+              {selectedCategory !== 'ALL'
+                ? 'Tidak ditemukan kartu untuk bab ini. Anda dapat beralih ke "Semua Bab (Campur)" atau mengunggah materi baru untuk bab ini.'
+                : 'Data kartu bawaan telah dikosongkan. Unggah dokumen latihan atau catatan materi TKA di menu Uploader untuk membuat Flashcard baru dengan AI.'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => (onNavigateTab ? onNavigateTab('uploader') : onBackToDashboard())}
-            className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-lg active:scale-95 cursor-pointer"
-          >
-            Buka Menu Uploader
-          </button>
+          <div className="flex items-center gap-3">
+            {selectedCategory !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory('ALL');
+                  applyFilterAndShuffle('ALL', allCards);
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition-all cursor-pointer"
+              >
+                Tampilkan Semua Bab
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => (onNavigateTab ? onNavigateTab('uploader') : onBackToDashboard())}
+              className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-lg active:scale-95 cursor-pointer"
+            >
+              Buka Menu Uploader
+            </button>
+          </div>
         </div>
       ) : isDeckCompleted ? (
         <CompletionCard 
