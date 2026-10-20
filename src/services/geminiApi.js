@@ -1,10 +1,12 @@
 // 1. API Key Resolution (Strictly via Environment Variable)
 export const getGeminiApiKey = () => {
-  const envKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || '';
-  if (envKey && envKey.trim().length > 0 && !envKey.includes('your_gemini_api_key')) {
-    return envKey.trim();
+  const envRaw = typeof import.meta !== 'undefined' ? import.meta.env?.VITE_GEMINI_API_KEY : undefined;
+  if (!envRaw) return '';
+  const cleaned = String(envRaw).trim().replace(/^["']|["']$/g, '').trim();
+  if (cleaned.length === 0 || cleaned.includes('your_gemini_api_key')) {
+    return '';
   }
-  return '';
+  return cleaned;
 };
 
 export const hasGeminiApiKey = () => {
@@ -87,24 +89,27 @@ CRITICAL: You MUST return ONLY a valid, parseable JSON object matching this sche
 }
 `;
 
-// 4. Live Gemini API Invocation
+// 4. Live Gemini API Invocation with Robust Multi-Model Fallback
 export const parseMaterialWithGemini = async ({ textContent, file = null, moduleName = '' }) => {
-  const apiKey = getGeminiApiKey();
+  // 1. Validasi Env Key (Strict check)
+  const envRaw = typeof import.meta !== 'undefined' ? import.meta.env?.VITE_GEMINI_API_KEY : undefined;
 
-  if (!apiKey) {
-    throw new Error(
-      'API Key Google Gemini belum ditemukan. Pastikan variabel VITE_GEMINI_API_KEY sudah disetel di file .env.local atau hosting.'
-    );
+  if (envRaw === undefined || envRaw === null || String(envRaw).trim() === '' || String(envRaw).includes('your_gemini_api_key')) {
+    throw new Error('API Key Belum Terpasang di Environtment');
   }
 
-  // Construct parts
+  const apiKey = String(envRaw).trim().replace(/^["']|["']$/g, '').trim();
+  if (!apiKey) {
+    throw new Error('API Key Belum Terpasang di Environtment');
+  }
+
+  // 2. Construct prompt parts
   const parts = [];
 
   const userModuleHint = moduleName && moduleName.trim().length > 0 
     ? `\n\n=== MODULE / CHAPTER TAG: "${moduleName.trim()}" (Use this tag for the "category" field of all generated items) ===`
     : '';
 
-  // Add system instruction as part of prompt
   parts.push({
     text: `${GEMINI_SYSTEM_INSTRUCTION}${userModuleHint}\n\n=== USER PROVIDED MATERIAL TO PARSE ===\n${textContent || '(See attached document)'}`,
   });
@@ -121,54 +126,96 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
       });
     } catch (fileErr) {
       console.error('Failed reading file as base64:', fileErr);
-      throw new Error(`Gagal membaca file ${file.name}. Pastikan file tidak rusak.`);
+      throw new Error(`Gagal membaca file ${file.name}. Pastikan file tidak rusak atau gunakan format PDF/TXT.`);
     }
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  // 3. Model Priority List with Automatic Graceful Fallbacks:
+  // Primary: gemini-1.5-flash
+  // Fallback 1: gemini-1.5-flash-latest
+  // Fallback 2: gemini-1.5-pro
+  const MODEL_CANDIDATES = [
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro',
+  ];
 
-  const payload = {
-    contents: [
-      {
-        parts,
-      },
-    ],
-    generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 8192,
-      responseMimeType: 'application/json',
-    },
+  const generationConfig = {
+    temperature: 0.3,
+    maxOutputTokens: 8192,
+    responseMimeType: 'application/json',
   };
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  let rawText = '';
+  let succeededModel = '';
+  const candidateErrors = [];
 
-  if (!response.ok) {
-    let errorMsg = `Gemini API Error: Status ${response.status} (${response.statusText})`;
+  // 4. Robust Try-Catch Execution with Multi-Model Fallback
+  for (const modelCandidate of MODEL_CANDIDATES) {
+    // Ensure clean model name without any accidental leading "models/" prefix
+    const cleanModelName = modelCandidate.replace(/^models\//, '');
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelName}:generateContent?key=${apiKey}`;
+
     try {
-      const errJson = await response.json();
-      if (errJson?.error?.message) {
-        errorMsg = errJson.error.message;
+      const payload = {
+        contents: [
+          {
+            parts,
+          },
+        ],
+        generationConfig,
+      };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        let errorDetails = `Status ${response.status} (${response.statusText})`;
+        try {
+          const errJson = await response.json();
+          if (errJson?.error?.message) {
+            errorDetails = errJson.error.message;
+          }
+        } catch (_) {}
+
+        console.warn(`[Gemini API] Percobaan model "${cleanModelName}" gagal: ${errorDetails}. Mencoba fallback berikutnya...`);
+        candidateErrors.push(`[${cleanModelName}]: ${errorDetails}`);
+        continue; // Fallback to next candidate in line
       }
-    } catch (e) {
-      // Ignore
+
+      const data = await response.json();
+      const contentText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!contentText || contentText.trim().length === 0) {
+        candidateErrors.push(`[${cleanModelName}]: Model tidak mengembalikan teks konten.`);
+        continue;
+      }
+
+      rawText = contentText;
+      succeededModel = cleanModelName;
+      console.info(`[Gemini API] Sukses generate soal menggunakan model: "${cleanModelName}"`);
+      break; // Successfully received response!
+    } catch (modelError) {
+      console.warn(`[Gemini API] Eksepsi saat memanggil model "${cleanModelName}":`, modelError.message);
+      candidateErrors.push(`[${cleanModelName}]: ${modelError.message}`);
     }
-    throw new Error(errorMsg);
   }
 
-  const data = await response.json();
-  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
+  // If all model candidates failed, throw descriptive error
   if (!rawText) {
-    throw new Error('Gemini tidak mengembalikan hasil teks yang valid.');
+    const errorDetails = candidateErrors.join(' | ');
+    throw new Error(
+      `Gagal memanggil API Gemini setelah mencoba model (${MODEL_CANDIDATES.join(', ')}). Rincian error: ${errorDetails || 'Koneksi ke server AI terputus.'}`
+    );
   }
 
-  // Parse JSON defensively
+  // 5. Defensive JSON Parsing
   let cleanedText = rawText.trim();
   if (cleanedText.startsWith('```json')) {
     cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
@@ -176,13 +223,29 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
     cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
   }
 
-  const parsed = JSON.parse(cleanedText);
+  let parsed = null;
+  try {
+    parsed = JSON.parse(cleanedText);
+  } catch (parseError) {
+    // Regex fallback to extract outer JSON structure
+    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch (_) {}
+    }
 
-  if (!parsed.flashcards || !parsed.bossQuizzes) {
-    throw new Error('Format respon Gemini tidak memuat array flashcards atau bossQuizzes.');
+    if (!parsed) {
+      console.error('JSON parsing failed on response from model:', succeededModel, cleanedText);
+      throw new Error(`Respon dari model "${succeededModel}" tidak berformat JSON valid. Silakan coba unggah materi kembali.`);
+    }
   }
 
-  // Ensure unique UUID/timestamp IDs and assign category tag if provided
+  if (!parsed.flashcards || !parsed.bossQuizzes || !Array.isArray(parsed.flashcards) || !Array.isArray(parsed.bossQuizzes)) {
+    throw new Error(`Format respon dari model "${succeededModel}" tidak memuat array flashcards atau bossQuizzes.`);
+  }
+
+  // 6. Ensure unique UUID/timestamp IDs and assign category tag if provided
   const timestamp = Date.now();
   const categoryTag = moduleName && moduleName.trim().length > 0 ? moduleName.trim() : null;
 
@@ -207,6 +270,7 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
   return {
     flashcards: formattedFlashcards,
     bossQuizzes: formattedBossQuizzes,
+    modelUsed: succeededModel,
   };
 };
 
