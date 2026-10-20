@@ -16,6 +16,7 @@ import {
 import { playSuccessSound, playVictoryFanfare } from '../../utils/audio';
 import { getStoredItem, setStoredItem, STORAGE_KEYS } from '../../utils/storage';
 import { shuffleArray } from '../../utils/shuffle';
+import { fetchCustomFlashcards, fetchCustomBossQuizzes } from '../../services/supabaseClient';
 
 export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
   // Helper to load combined master sentences (Custom + Auto-derived from Uploaded Flashcards & Boss Quizzes)
@@ -76,6 +77,49 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
     setMicError(null);
     setIsCompleted(false);
   };
+
+  // Sync from Supabase Cloud on mount (enables cross-device sync between Laptop and HP)
+  useEffect(() => {
+    let isMounted = true;
+    Promise.all([fetchCustomFlashcards(), fetchCustomBossQuizzes()]).then(
+      ([remoteFc, remoteBq]) => {
+        if (!isMounted) return;
+        if ((remoteFc && remoteFc.length > 0) || (remoteBq && remoteBq.length > 0)) {
+          // Derive speech sentences from cloud-synced flashcards & boss quizzes
+          const cloudDerived = deriveSpeechSentences(remoteFc, remoteBq);
+          const localStored = getStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, []);
+
+          // Merge unique sentences (cloud derived + any local inputs)
+          const merged = [
+            ...cloudDerived,
+            ...localStored.filter(
+              (l) => !cloudDerived.some((c) => c.sentence.toLowerCase() === l.sentence.toLowerCase())
+            ),
+          ];
+
+          setStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, merged);
+          setAllSentences(merged);
+
+          setSentences((prev) => {
+            // If currently empty or fewer items than cloud data, update with shuffled merged list
+            if (prev.length === 0 || prev.length < merged.length) {
+              const filtered =
+                selectedCategory === 'ALL'
+                  ? merged
+                  : merged.filter(
+                      (s) => (s.category || '').toLowerCase() === selectedCategory.toLowerCase()
+                    );
+              return shuffleArray(filtered);
+            }
+            return prev;
+          });
+        }
+      }
+    );
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Run strictly ONCE on mount!
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
@@ -279,54 +323,64 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
 
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col space-y-4 sm:space-y-5 animate-fadeIn select-none">
-      {/* 1. Header Navigation */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onBackToDashboard}
-            aria-label="Kembali ke Dashboard"
-            className="p-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 transition shadow-sm"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              Speech Lab
-              <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
-                AI Coach
-              </span>
-            </h2>
-            <p className="text-xs text-slate-400">
-              Latih pengucapanmu dengan kontrol rekam manual penuh.
-            </p>
+      {/* 1. Header Navigation & Filter Controls (Fully Mobile-Friendly) */}
+      <div className="flex flex-col gap-2.5 pb-3 border-b border-slate-800/80">
+        {/* Row 1: Back Button, Title & Progress Badge */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <button
+              type="button"
+              onClick={onBackToDashboard}
+              aria-label="Kembali ke Dashboard"
+              className="p-1.5 sm:p-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 transition shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                Speech Lab
+                <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                  AI Coach
+                </span>
+              </h2>
+              <p className="text-[11px] sm:text-xs text-slate-400 line-clamp-1">
+                Latih pengucapanmu dengan kontrol rekam manual penuh.
+              </p>
+            </div>
+          </div>
+
+          {/* Progress Counter Badge */}
+          <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold shadow shrink-0">
+            <Activity className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">TKA English</span>
+            <span className="text-slate-300 font-mono text-[11px]">
+              {totalSentences === 0 ? '0/0' : `${currentIndex + 1}/${totalSentences}`}
+            </span>
           </div>
         </div>
 
-        {/* Right Badges, Filter, Accent Selector & Add Sentence Button */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Chapter / Category Filter Dropdown */}
-          {categories.length > 0 && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700/80 text-xs shadow-sm">
-              <Filter className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-              <select
-                value={selectedCategory}
-                onChange={handleCategoryChange}
-                aria-label="Pilih Bab Latihan"
-                className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer pr-1"
-              >
-                <option value="ALL" className="bg-slate-900 text-white">Semua Bab (Campur)</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat} className="bg-slate-900 text-white">
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        {/* Row 2: Chapter Dropdown, Accent Selector & Add Custom Sentence Button */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap pt-0.5">
+          {/* Chapter / Category Filter Dropdown (Always visible on mobile & desktop) */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700/80 text-xs shadow-sm flex-1 sm:flex-none">
+            <Filter className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <select
+              value={selectedCategory}
+              onChange={handleCategoryChange}
+              aria-label="Pilih Bab Latihan"
+              className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer pr-1 w-full sm:max-w-[190px] truncate"
+            >
+              <option value="ALL" className="bg-slate-900 text-white">Semua Bab (Campur)</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat} className="bg-slate-900 text-white">
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Accent / Speech Recognition Language Selector */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700/80 text-xs shadow-sm">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700/80 text-xs shadow-sm shrink-0">
             <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             <select
               value={speechLang}
@@ -336,25 +390,19 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
             >
               <option value="en-US" className="bg-slate-900 text-white">English (US)</option>
               <option value="en-GB" className="bg-slate-900 text-white">English (UK)</option>
-              <option value="id-ID" className="bg-slate-900 text-white">Indonesia (Bilingual)</option>
+              <option value="id-ID" className="bg-slate-900 text-white">Indonesia</option>
             </select>
           </div>
 
+          {/* Add Custom Sentence Button */}
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold transition cursor-pointer shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Input Kalimat</span>
           </button>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold shadow">
-            <Activity className="w-4 h-4 text-emerald-400" />
-            <span className="hidden sm:inline">TKA English</span>
-            <span className="text-slate-400 font-mono text-[11px]">
-              {totalSentences === 0 ? '0/0' : `${currentIndex + 1}/${totalSentences}`}
-            </span>
-          </div>
         </div>
       </div>
 

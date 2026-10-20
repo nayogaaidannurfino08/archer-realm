@@ -218,7 +218,7 @@ export const BattleStage = ({
   const isStorm = activeCharacter === 'storm';
 
   return (
-    <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#060b14] h-40 sm:h-48 shadow-2xl flex flex-col justify-between select-none">
+    <div className="relative w-full overflow-hidden rounded-2xl border border-slate-800 bg-[#060b14] h-44 sm:h-52 shadow-2xl flex flex-col justify-between select-none">
       {/* 1. CLEAN MODERN DARK FANTASY FLAT BACKGROUND (NO REALISTIC IMAGE) */}
       {/* Gradient Night Sky */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#0b1325] via-[#070d18] to-[#040810]" />
@@ -266,53 +266,56 @@ export const BattleStage = ({
         )}
       </AnimatePresence>
 
-      {/* 2. TOP HUD (Hearts, Round, Boss HP) */}
-      <div className="relative z-30 flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
-        {/* Left: Player Hearts */}
-        <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-950/85 backdrop-blur-md border border-slate-800/80 shadow-md">
-          {Array.from({ length: maxHearts }).map((_, index) => {
-            const isAlive = index < playerHearts;
-            return (
-              <motion.div
-                key={index}
-                animate={isAlive ? { scale: [1, 1.15, 1] } : { scale: 0.8 }}
-                transition={{ duration: 1.5, repeat: isAlive ? Infinity : 0, delay: index * 0.2 }}
-              >
-                <Heart
-                  className={`w-4 h-4 transition-colors duration-300 ${
-                    isAlive
-                      ? 'text-rose-500 fill-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]'
-                      : 'text-slate-700 fill-slate-800'
-                  }`}
-                />
-              </motion.div>
-            );
-          })}
-          <span className="text-[11px] font-bold text-slate-300 ml-1">
-            {playerHearts} / {maxHearts}
+      {/* 2. TOP HUD (Hearts, Round, Boss HP) - Fully Optimized for Mobile & Desktop */}
+      <div className="relative z-30 flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2 gap-1.5">
+        {/* Left: Player Hearts (Spaced with clean 3/3 badge) */}
+        <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-slate-950/90 backdrop-blur-md border border-slate-800 shadow-md shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1">
+            {Array.from({ length: maxHearts }).map((_, index) => {
+              const isAlive = index < playerHearts;
+              return (
+                <motion.div
+                  key={index}
+                  animate={isAlive ? { scale: [1, 1.15, 1] } : { scale: 0.8 }}
+                  transition={{ duration: 1.5, repeat: isAlive ? Infinity : 0, delay: index * 0.2 }}
+                >
+                  <Heart
+                    className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-colors duration-300 ${
+                      isAlive
+                        ? 'text-rose-500 fill-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]'
+                        : 'text-slate-700 fill-slate-800'
+                    }`}
+                  />
+                </motion.div>
+              );
+            })}
+          </div>
+          <span className="text-[10px] sm:text-[11px] font-bold text-slate-300 ml-0.5 sm:ml-1 font-mono">
+            {playerHearts}/{maxHearts}
           </span>
         </div>
 
         {/* Center: Round Indicator */}
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/85 backdrop-blur-md border border-slate-800 text-[10px] sm:text-[11px] font-bold text-slate-300 shadow">
-          <Sparkles className="w-3 h-3 text-amber-400" />
-          <span>Babak {currentRound} / {totalRounds}</span>
+        <div className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 rounded-full bg-slate-950/90 backdrop-blur-md border border-slate-800 text-[10px] sm:text-[11px] font-bold text-slate-300 shadow shrink-0">
+          <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+          <span className="hidden sm:inline">Babak {currentRound} / {totalRounds}</span>
+          <span className="sm:hidden font-mono">{currentRound}/{totalRounds}</span>
         </div>
 
-        {/* Right: Boss HP Bar */}
-        <div className="bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/80 flex items-center gap-2 shadow-md">
-          <div className="flex items-center gap-1">
-            <Flame className="w-3.5 h-3.5 text-rose-500 animate-pulse fill-rose-500" />
-            <span className="text-[10px] font-black text-rose-300 tracking-wider">BOSS</span>
+        {/* Right: Boss HP Bar (Compact on mobile so it never gets clipped) */}
+        <div className="bg-slate-950/90 backdrop-blur-md px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-700/80 flex items-center gap-1.5 sm:gap-2 shadow-md shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1">
+            <Flame className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-rose-500 animate-pulse fill-rose-500 shrink-0" />
+            <span className="text-[9px] sm:text-[10px] font-black text-rose-300 tracking-wider">BOSS</span>
           </div>
-          <div className="w-20 sm:w-28 h-2 rounded-full bg-slate-900 border border-slate-800 overflow-hidden relative">
+          <div className="w-14 sm:w-28 h-2 rounded-full bg-slate-900 border border-slate-800 overflow-hidden relative">
             <motion.div
               className="h-full rounded-full bg-gradient-to-r from-rose-600 via-orange-500 to-amber-400 shadow-[0_0_10px_rgba(244,63,94,0.8)]"
               animate={{ width: `${Math.max(0, bossHp)}%` }}
               transition={{ duration: 0.45, ease: 'easeOut' }}
             />
           </div>
-          <span className="text-[10px] font-mono font-bold text-slate-300 w-7 text-right">
+          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-slate-300 min-w-[28px] sm:min-w-[32px] text-right">
             {Math.max(0, Math.round(bossHp))}%
           </span>
         </div>

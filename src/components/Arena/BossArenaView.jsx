@@ -280,15 +280,15 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard, 
         </div>
 
         {/* Right Section: Chapter Filter Dropdown & Hearts Indicator */}
-        <div className="flex items-center justify-between sm:justify-end gap-2.5">
-          {/* Chapter Filter Dropdown */}
-          <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 rounded-xl px-2.5 py-1.5 shadow-sm text-xs">
+        <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+          {/* Chapter Filter Dropdown (Expands cleanly on mobile) */}
+          <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 rounded-xl px-2.5 py-1.5 shadow-sm text-xs flex-1 sm:flex-none">
             <Filter className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <select
               value={selectedCategory}
               onChange={handleCategoryChange}
               aria-label="Filter Bab / Modul"
-              className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer pr-1 max-w-[150px] sm:max-w-[190px] truncate"
+              className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer pr-1 w-full sm:max-w-[190px] truncate"
             >
               <option value="ALL" className="bg-slate-900 text-white">
                 Semua Bab (Campur)
@@ -301,8 +301,8 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard, 
             </select>
           </div>
 
-          {/* Hearts Indicator */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 shadow">
+          {/* Hearts Indicator (Desktop View) */}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 shadow shrink-0">
             {Array.from({ length: 3 }).map((_, i) => (
               <Heart
                 key={i}

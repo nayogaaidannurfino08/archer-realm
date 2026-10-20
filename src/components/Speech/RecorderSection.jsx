@@ -8,7 +8,7 @@ export const RecorderSection = ({
   onToggleRecord,
 }) => {
   return (
-    <div className="flex flex-col items-center justify-center p-5 sm:p-6 rounded-2xl bg-[#0f1828]/95 border border-slate-800/90 shadow-xl relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center p-3.5 sm:p-6 rounded-2xl bg-[#0f1828]/95 border border-slate-800/90 shadow-xl relative overflow-hidden">
       {/* Sound Waveforms & Central Microphone */}
       <div className="flex items-center justify-center gap-6 sm:gap-10 py-2 w-full max-w-md relative z-10">
         {/* Left Simulated Animated Soundwave */}
