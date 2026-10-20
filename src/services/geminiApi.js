@@ -19,7 +19,6 @@ export const fileToBase64 = (file) => {
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result;
-      // Extract pure base64 without prefix
       const base64Data = dataUrl.split(',')[1];
       resolve(base64Data);
     };
@@ -28,93 +27,114 @@ export const fileToBase64 = (file) => {
   });
 };
 
-// 3. System Prompt & Instruction (Expanded Quota: 20-25 questions each)
+// 3. System Prompt & Instruction (Standardized for TKA English & Archer Realm)
 const GEMINI_SYSTEM_INSTRUCTION = `
 You are an expert TKA English exam creator, linguist, and curriculum specialist for Archer Realm.
-Your objective is to analyze Indonesian high school / university entrance exam materials (TKA Bahasa Inggris), academic English articles, reading texts, or grammar notes provided by the user.
+From the provided learning material, articles, reading texts, or grammar notes, extract and generate two high-impact learning datasets:
 
-You must extract and generate two high-impact learning datasets based on the provided text or document:
-
-1. "flashcards" (Confusion Words / Kata Ambigu):
-   - Identify pairs of easily confused English words (e.g., Affect vs Effect, Complement vs Compliment, Principle vs Principal, Beside vs Besides, Stationary vs Stationery, Illusion vs Allusion, Eminent vs Imminent, Advice vs Advise, Cite vs Site, Disinterested vs Uninterested, Farther vs Further, Loose vs Lose, Precede vs Proceed, Discrete vs Discreet, Council vs Counsel, etc.).
+1. "flashcards" (Confusion Words / Vocabulary Mastery):
+   - Pairs of easily confused English words (e.g. Affect vs Effect, Complement vs Compliment, Principle vs Principal, Beside vs Besides, Stationary vs Stationery, Illusion vs Allusion, Eminent vs Imminent, Advice vs Advise, Cite vs Site, Loose vs Lose).
    - Generate AT LEAST 20 to 25 unique flashcard duel items.
-   - For each card, write an authentic TKA-style fill-in-the-blank question (use '_____' for blank).
+   - Fill-in-the-blank question using '_____'.
    - WordA corresponds to Choice A, WordB corresponds to Choice B.
    - correctChoice MUST be either "A" or "B".
-   - Include friendly, conversational explanation in Indonesian (whyWrong, keyRule, example).
+   - Include friendly explanation in Indonesian (whyWrong, keyRule, example).
 
-2. "bossQuizzes" (TKA Grammar Comprehension / Boss Arena Battles):
-   - Generate AT LEAST 20 to 25 True/False grammar analysis questions based on grammar patterns found in the material (e.g., Subjunctive Mood, Negative Inversion, Inverted Conditionals, Subject-Verb Agreement, Parallel Structure, Dangling Modifiers, Relative Clauses, Reduced Clauses, Modals).
-   - Give a full sentence.
-   - Set questionText to "Read the sentence and choose True (grammatically sound) or False (contains grammatical error)."
-   - Two options: Label "A" is "True", Label "B" is "False". Exactly ONE option has isCorrect: true.
-   - In explanation, state errorFound, rule, and correctSentence in clear Indonesian.
+2. "boss_quizzes" or "bossQuizzes" (TKA Grammar Inversion & True/False Comprehension):
+   - Generate AT LEAST 20 to 25 True/False grammar analysis questions (e.g. Subjunctive Mood, Negative Inversion, Inverted Conditionals, Subject-Verb Agreement, Parallelism).
+   - Set questionText to "Read the sentence and choose True or False."
+   - Two options: Label "A" is "True", Label "B" is "False". Exactly one has isCorrect: true.
+   - Include explanation with errorFound, rule, and correctSentence.
 
-CRITICAL: You MUST return ONLY a valid, parseable JSON object matching this schema without any markdown wraps:
+CRITICAL: Return ONLY a valid JSON object without markdown formatting:
 {
   "flashcards": [
     {
-      "id": "gen_fc_1",
-      "wordA": "Word 1",
-      "wordB": "Word 2",
+      "wordA": "Affect",
+      "wordB": "Effect",
       "category": "Confusion Words",
-      "subtitle": "Penjelasan ringkas konteks pembeda",
-      "contextQuestion": "Kalimat rumpang standar TKA...",
-      "correctChoice": "B",
-      "quickTips": "Trik kilat membedakan",
+      "subtitle": "Mempengaruhi (V) vs Dampak (N)",
+      "contextQuestion": "Macroeconomic fluctuations will severely _____ consumption.",
+      "correctChoice": "A",
+      "quickTips": "Affect Verb, Effect Noun",
       "explanation": {
-        "whyWrong": "Alasan opsi salah keliru dengan bahasa santai.",
-        "keyRule": "Rumus cepatnya.",
-        "example": "Contoh kalimat pembanding."
+        "whyWrong": "Dibutuhkan kata kerja setelah will.",
+        "keyRule": "Affect = kata kerja, Effect = kata benda.",
+        "example": "The decision affected us deeply."
       }
     }
   ],
-  "bossQuizzes": [
+  "boss_quizzes": [
     {
-      "id": "gen_bq_1",
       "category": "TKA Comprehension",
-      "sentence": "Kalimat yang dianalisis...",
+      "sentence": "Rarely have researchers discovered such remarkable biological adaptation.",
       "questionText": "Read the sentence and choose True or False.",
       "options": [
         { "label": "A", "text": "True", "isCorrect": true },
         { "label": "B", "text": "False", "isCorrect": false }
       ],
       "explanation": {
-        "errorFound": "Letak kesalahan jika kalimat salah.",
-        "rule": "Aturan gramatikal yang berlaku.",
-        "correctSentence": "Kalimat yang benar."
+        "errorFound": "Tidak ada kesalahan. Kalimat gramatikal.",
+        "rule": "Negative inversion (Rarely have researchers discovered) sudah tepat.",
+        "correctSentence": "Rarely have researchers discovered such remarkable biological adaptation."
       }
     }
   ]
 }
 `;
 
-// 4. Live Gemini API Invocation with Robust Multi-Model Fallback
-export const parseMaterialWithGemini = async ({ textContent, file = null, moduleName = '' }) => {
-  // 1. Validasi Env Key (Strict check)
-  const envRaw = typeof import.meta !== 'undefined' ? import.meta.env?.VITE_GEMINI_API_KEY : undefined;
+// Helper: Dynamically discover active generative models authorized for this API key
+async function getSupportedModelList(apiKey) {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.models) && data.models.length > 0) {
+        const generationModels = data.models
+          .filter(
+            (m) =>
+              Array.isArray(m.supportedGenerationMethods) &&
+              m.supportedGenerationMethods.includes('generateContent')
+          )
+          .map((m) => m.name.replace(/^models\//, ''));
 
-  if (envRaw === undefined || envRaw === null || String(envRaw).trim() === '' || String(envRaw).includes('your_gemini_api_key')) {
-    throw new Error('API Key Belum Terpasang di Environtment');
+        if (generationModels.length > 0) {
+          // Sort so newest active flash models come first (3.8-flash, 3.6-flash, etc.)
+          return generationModels.sort((a, b) => {
+            const aPref = a.includes('3.8-flash') ? -4 : a.includes('3.6-flash') ? -3 : a.includes('3.5-flash') ? -2 : a.includes('flash') ? -1 : 1;
+            const bPref = b.includes('3.8-flash') ? -4 : b.includes('3.6-flash') ? -3 : b.includes('3.5-flash') ? -2 : b.includes('flash') ? -1 : 1;
+            return aPref - bPref;
+          });
+        }
+      }
+    }
+  } catch (_) {
+    // Dynamic discovery fallback
   }
+  return [];
+}
 
-  const apiKey = String(envRaw).trim().replace(/^["']|["']$/g, '').trim();
+// 4. Live Gemini API Direct REST Fetch
+export const parseMaterialWithGemini = async ({ textContent, file = null, moduleName = '' }) => {
+  // 1. Validasi Env Key
+  const apiKey = getGeminiApiKey();
   if (!apiKey) {
-    throw new Error('API Key Belum Terpasang di Environtment');
+    throw new Error('VITE_GEMINI_API_KEY belum terpasang di Vercel/Environment.');
   }
 
   // 2. Construct prompt parts
   const parts = [];
-
-  const userModuleHint = moduleName && moduleName.trim().length > 0 
-    ? `\n\n=== MODULE / CHAPTER TAG: "${moduleName.trim()}" (Use this tag for the "category" field of all generated items) ===`
-    : '';
+  const userModuleHint =
+    moduleName && moduleName.trim().length > 0
+      ? `\n\n=== MODULE / CHAPTER TAG: "${moduleName.trim()}" (Use this tag for the "category" field of all generated items) ===`
+      : '';
 
   parts.push({
-    text: `${GEMINI_SYSTEM_INSTRUCTION}${userModuleHint}\n\n=== USER PROVIDED MATERIAL TO PARSE ===\n${textContent || '(See attached document)'}`,
+    text: `${GEMINI_SYSTEM_INSTRUCTION}${userModuleHint}\n\n=== USER PROVIDED MATERIAL TO PARSE ===\n${
+      textContent || '(See attached document)'
+    }`,
   });
 
-  // If a file is uploaded, convert and attach as inlineData
   if (file) {
     try {
       const base64Data = await fileToBase64(file);
@@ -130,88 +150,91 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
     }
   }
 
-  // 3. Model Priority List with Automatic Graceful Fallbacks:
-  // Primary: gemini-1.5-flash
-  // Fallback 1: gemini-1.5-flash-latest
-  // Fallback 2: gemini-1.5-pro
-  const MODEL_CANDIDATES = [
+  // 3. Dynamic Discovery + Active Models Fallback List (Aligned with latest changelog)
+  const discoveredModels = await getSupportedModelList(apiKey);
+  const fallbackModels = [
+    'gemini-3.8-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-flash-latest',
+    'gemini-4-argon',
+    'gemini-2.5-flash',
     'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-pro',
   ];
 
-  const generationConfig = {
-    temperature: 0.3,
-    maxOutputTokens: 8192,
-    responseMimeType: 'application/json',
+  // Candidates list: dynamic discovered models first, followed by standard fallback list
+  const modelCandidates = Array.from(new Set([...discoveredModels, ...fallbackModels]));
+
+  const payload = {
+    contents: [{ parts }],
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 8192,
+      responseMimeType: 'application/json',
+    },
   };
 
   let rawText = '';
   let succeededModel = '';
-  const candidateErrors = [];
+  const attemptedErrors = [];
 
-  // 4. Robust Try-Catch Execution with Multi-Model Fallback
-  for (const modelCandidate of MODEL_CANDIDATES) {
-    // Ensure clean model name without any accidental leading "models/" prefix
-    const cleanModelName = modelCandidate.replace(/^models\//, '');
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelName}:generateContent?key=${apiKey}`;
+  // 4. Direct REST Fetch with Multi-Model & Multi-API Version Fallback
+  for (const modelCandidate of modelCandidates) {
+    const cleanModel = modelCandidate.replace(/^models\//, '');
 
-    try {
-      const payload = {
-        contents: [
-          {
-            parts,
+    // Try v1beta first; if 404, try v1
+    for (const apiVersion of ['v1beta', 'v1']) {
+      const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${cleanModel}:generateContent?key=${apiKey}`;
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
           },
-        ],
-        generationConfig,
-      };
+          body: JSON.stringify(payload),
+        });
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify(payload),
-      });
+        if (!response.ok) {
+          let errorMsg = `HTTP ${response.status} (${response.statusText})`;
+          try {
+            const errData = await response.json();
+            if (errData?.error?.message) {
+              errorMsg = errData.error.message;
+            }
+          } catch (_) {}
 
-      if (!response.ok) {
-        let errorDetails = `Status ${response.status} (${response.statusText})`;
-        try {
-          const errJson = await response.json();
-          if (errJson?.error?.message) {
-            errorDetails = errJson.error.message;
-          }
-        } catch (_) {}
+          attemptedErrors.push(`[${apiVersion}/${cleanModel}]: ${errorMsg}`);
+          continue;
+        }
 
-        console.warn(`[Gemini API] Percobaan model "${cleanModelName}" gagal: ${errorDetails}. Mencoba fallback berikutnya...`);
-        candidateErrors.push(`[${cleanModelName}]: ${errorDetails}`);
-        continue; // Fallback to next candidate in line
+        const data = await response.json();
+        const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!textOutput || textOutput.trim().length === 0) {
+          attemptedErrors.push(`[${apiVersion}/${cleanModel}]: Empty response`);
+          continue;
+        }
+
+        rawText = textOutput;
+        succeededModel = `${apiVersion}/${cleanModel}`;
+        console.info(`[Google AI Studio] Sukses generate soal menggunakan model: ${succeededModel}`);
+        break; // Success! Break out of apiVersion loop
+      } catch (netErr) {
+        attemptedErrors.push(`[${apiVersion}/${cleanModel}]: ${netErr.message}`);
       }
+    }
 
-      const data = await response.json();
-      const contentText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!contentText || contentText.trim().length === 0) {
-        candidateErrors.push(`[${cleanModelName}]: Model tidak mengembalikan teks konten.`);
-        continue;
-      }
-
-      rawText = contentText;
-      succeededModel = cleanModelName;
-      console.info(`[Gemini API] Sukses generate soal menggunakan model: "${cleanModelName}"`);
-      break; // Successfully received response!
-    } catch (modelError) {
-      console.warn(`[Gemini API] Eksepsi saat memanggil model "${cleanModelName}":`, modelError.message);
-      candidateErrors.push(`[${cleanModelName}]: ${modelError.message}`);
+    if (rawText) {
+      break; // Success! Break out of modelCandidates loop
     }
   }
 
-  // If all model candidates failed, throw descriptive error
   if (!rawText) {
-    const errorDetails = candidateErrors.join(' | ');
+    const errorSummary = attemptedErrors.slice(0, 3).join(' | ');
     throw new Error(
-      `Gagal memanggil API Gemini setelah mencoba model (${MODEL_CANDIDATES.join(', ')}). Rincian error: ${errorDetails || 'Koneksi ke server AI terputus.'}`
+      `Gagal menghasilkan soal dari Google Gemini API. Rincian: ${errorSummary || 'Koneksi ke AI Studio terputus.'}`
     );
   }
 
@@ -226,8 +249,7 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
   let parsed = null;
   try {
     parsed = JSON.parse(cleanedText);
-  } catch (parseError) {
-    // Regex fallback to extract outer JSON structure
+  } catch (_) {
     const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
@@ -236,34 +258,99 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
     }
 
     if (!parsed) {
-      console.error('JSON parsing failed on response from model:', succeededModel, cleanedText);
-      throw new Error(`Respon dari model "${succeededModel}" tidak berformat JSON valid. Silakan coba unggah materi kembali.`);
+      console.error('Failed to parse Gemini output:', cleanedText);
+      throw new Error('Respon dari Google Gemini tidak berformat JSON valid. Silakan coba unggah materi kembali.');
     }
   }
 
-  if (!parsed.flashcards || !parsed.bossQuizzes || !Array.isArray(parsed.flashcards) || !Array.isArray(parsed.bossQuizzes)) {
-    throw new Error(`Format respon dari model "${succeededModel}" tidak memuat array flashcards atau bossQuizzes.`);
+  // 6. Comprehensive Normalization for both Schemas
+  const rawFlashcards = Array.isArray(parsed.flashcards) ? parsed.flashcards : [];
+  const rawBossQuizzes = Array.isArray(parsed.bossQuizzes)
+    ? parsed.bossQuizzes
+    : Array.isArray(parsed.boss_quizzes)
+    ? parsed.boss_quizzes
+    : [];
+
+  if (rawFlashcards.length === 0 && rawBossQuizzes.length === 0) {
+    throw new Error('Respon Gemini tidak memuat array flashcards atau boss_quizzes.');
   }
 
-  // 6. Ensure unique UUID/timestamp IDs and assign category tag if provided
   const timestamp = Date.now();
   const categoryTag = moduleName && moduleName.trim().length > 0 ? moduleName.trim() : null;
 
-  const formattedFlashcards = parsed.flashcards.map((fc, index) => {
+  const formattedFlashcards = rawFlashcards.map((fc, index) => {
     const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const wordA = fc.wordA || fc.word || 'Word A';
+    const wordB = fc.wordB || fc.pair || fc.word2 || 'Word B';
+    const contextQuestion =
+      fc.contextQuestion ||
+      fc.sentence ||
+      fc.question ||
+      `The student must differentiate between ${wordA} and ${wordB}.`;
+
+    let correctChoice = 'A';
+    if (fc.correctChoice === 'A' || fc.correctChoice === 'B') {
+      correctChoice = fc.correctChoice;
+    } else if (fc.correct) {
+      correctChoice = String(fc.correct).trim().toLowerCase() === wordB.toLowerCase() ? 'B' : 'A';
+    }
+
     return {
-      ...fc,
-      id: `fc_${timestamp}_${randomSuffix}_${index + 1}`,
+      id: fc.id || `fc_${timestamp}_${randomSuffix}_${index + 1}`,
+      wordA,
+      wordB,
       category: categoryTag || fc.category || 'Confusion Words (AI)',
+      subtitle: fc.subtitle || fc.meaning || 'Kata yang sering tertukar dalam ujian TKA',
+      contextQuestion,
+      correctChoice,
+      quickTips: typeof fc.quickTips === 'string' ? fc.quickTips : fc.meaning || `${wordA} vs ${wordB}`,
+      explanation:
+        typeof fc.explanation === 'object' && fc.explanation !== null
+          ? fc.explanation
+          : {
+              whyWrong: `Pilihan yang tepat dalam kalimat ini adalah ${correctChoice === 'A' ? wordA : wordB}.`,
+              keyRule: `Perhatikan konteks gramatikal dan makna dari ${wordA} dan ${wordB}.`,
+              example: `${wordA} dan ${wordB} memiliki fungsi gramatikal yang berbeda dalam kalimat.`,
+            },
     };
   });
 
-  const formattedBossQuizzes = parsed.bossQuizzes.map((bq, index) => {
+  const formattedBossQuizzes = rawBossQuizzes.map((bq, index) => {
     const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const sentence = bq.sentence || bq.text || '';
+    const questionText = bq.questionText || bq.question_text || 'Read the sentence and choose True or False.';
+
+    let options = [
+      { label: 'A', text: 'True', isCorrect: true },
+      { label: 'B', text: 'False', isCorrect: false },
+    ];
+
+    if (Array.isArray(bq.options) && bq.options.length > 0) {
+      if (typeof bq.options[0] === 'object') {
+        options = bq.options;
+      } else {
+        const correctAns = String(bq.correct_answer || bq.correct || 'A').toUpperCase();
+        options = [
+          { label: 'A', text: 'True', isCorrect: correctAns === 'A' || correctAns === 'TRUE' },
+          { label: 'B', text: 'False', isCorrect: correctAns === 'B' || correctAns === 'FALSE' },
+        ];
+      }
+    }
+
     return {
-      ...bq,
-      id: `bq_${timestamp}_${randomSuffix}_${index + 1}`,
+      id: bq.id || `bq_${timestamp}_${randomSuffix}_${index + 1}`,
       category: categoryTag || bq.category || 'TKA Comprehension (AI)',
+      sentence,
+      questionText,
+      options,
+      explanation:
+        typeof bq.explanation === 'object' && bq.explanation !== null
+          ? bq.explanation
+          : {
+              errorFound: bq.explanation || 'Analisis struktur gramatikal kalimat.',
+              rule: 'Kaidah tata bahasa standar TKA Bahasa Inggris.',
+              correctSentence: sentence,
+            },
     };
   });
 
@@ -274,13 +361,18 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
   };
 };
 
+// Direct Text Generator wrapper alias
+export async function generateQuestionsFromText(inputText, moduleName = '') {
+  return await parseMaterialWithGemini({ textContent: inputText, moduleName });
+}
+
 // 5. Offline Demo / Realistic Mock Parser (Generates 20+ items each for complete offline testing)
 export const parseMaterialWithMock = async ({ textContent, file = null, moduleName = '' }) => {
-  // Simulate network latency (800ms)
   await new Promise((resolve) => setTimeout(resolve, 800));
 
   const timestamp = Date.now();
-  const categoryTag = moduleName && moduleName.trim().length > 0 ? moduleName.trim() : 'Bab 1: Subjunctive & Inversion';
+  const categoryTag =
+    moduleName && moduleName.trim().length > 0 ? moduleName.trim() : 'Bab 1: Subjunctive & Inversion';
 
   const mockPairs = [
     { a: 'Principal', b: 'Principle', q: 'The school _____ delivered an inspiring speech about maintaining integrity.', c: 'A', st: 'Kepala Sekolah vs Asas Fundamental' },

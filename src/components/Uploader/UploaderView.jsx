@@ -67,7 +67,7 @@ export const UploaderView = ({ onNavigateTab }) => {
 
       // If user forces mock OR no key is configured, run demo mock
       if (forceMock || !isKeyAvailable) {
-        setProgressStep('Menjalankan Gemini 1.5 Flash Parser (Demo Mode 20+ Soal)...');
+        setProgressStep('Menjalankan Gemini AI Parser (Demo Mode 20+ Soal)...');
         const mockResult = await parseMaterialWithMock({
           textContent: pastedText,
           file: selectedFile,
@@ -85,8 +85,8 @@ export const UploaderView = ({ onNavigateTab }) => {
         return;
       }
 
-      // Live Gemini 1.5 Flash Call
-      setProgressStep('Mengirim materi ke Google Gemini 1.5 Flash (Target 20-25 Soal)...');
+      // Live Gemini AI Studio Call
+      setProgressStep('Mengirim materi ke Google Gemini AI Studio (Target 20-25 Soal)...');
       const result = await parseMaterialWithGemini({
         textContent: activeTab === 'text' ? pastedText : '',
         file: activeTab === 'file' ? selectedFile : null,
@@ -137,7 +137,7 @@ export const UploaderView = ({ onNavigateTab }) => {
               </h2>
               <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
                 <Sparkles className="w-3 h-3 text-cyan-400" />
-                Gemini 1.5 Flash (Kuota 20-25 Soal)
+                Gemini AI Studio (Flash Model)
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-400 mt-0.5">

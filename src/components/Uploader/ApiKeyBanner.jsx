@@ -22,7 +22,7 @@ export const ApiKeyBanner = () => {
           <div>
             <div className="flex items-center gap-2">
               <h4 className="text-xs sm:text-sm font-bold text-white tracking-tight">
-                {hasKey ? 'Google Gemini 1.5 Flash Aktif' : 'Fitur AI Siap Dikonfigurasi'}
+                {hasKey ? 'Google Gemini AI Studio Aktif' : 'Fitur AI Siap Dikonfigurasi'}
               </h4>
               <span
                 className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
@@ -36,7 +36,7 @@ export const ApiKeyBanner = () => {
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
               {hasKey
-                ? 'Sistem terhubung ke Gemini 1.5 Flash Free Tier via environment variable hosting.'
+                ? 'Sistem terhubung ke Gemini AI Studio (Flash Model) Free Tier via environment variable hosting.'
                 : 'Fitur AI memerlukan konfigurasi Environment Variable di hosting (VITE_GEMINI_API_KEY).'}
             </p>
           </div>
