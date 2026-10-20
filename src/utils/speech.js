@@ -1,39 +1,194 @@
 // Web Speech API Native Utilities for Archer Realm Speech Lab
 
-// 1. Text-To-Speech (Native SpeechSynthesis)
+let currentAudioElement = null;
+
+export const stopSpeaking = () => {
+  if (typeof window !== 'undefined') {
+    if ('speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (_) {}
+    }
+    if (currentAudioElement) {
+      try {
+        currentAudioElement.pause();
+        currentAudioElement.currentTime = 0;
+      } catch (_) {}
+      currentAudioElement = null;
+    }
+  }
+};
+
+// 1. Text-To-Speech with Mobile Android/iOS Fallback
 export const speakSentence = (text, onEnd, lang = 'en-US') => {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    console.warn('SpeechSynthesis is not supported in this browser.');
+  if (typeof window === 'undefined') {
+    if (onEnd) onEnd();
     return;
   }
 
-  // Cancel any ongoing speech
-  window.speechSynthesis.cancel();
+  stopSpeaking();
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = lang;
-  utterance.rate = 0.88; // Slightly measured pace for pedagogical clarity
-  utterance.pitch = 1.0;
-
-  // Prefer natural voices matching the requested language
-  const voices = window.speechSynthesis.getVoices();
-  const langPrefix = lang.split('-')[0].toLowerCase();
-  const preferredVoice = voices.find(
-    (v) => v.lang.toLowerCase().startsWith(lang.toLowerCase()) && !v.name.includes('Google')
-  ) || voices.find(
-    (v) => v.lang.toLowerCase().startsWith(langPrefix)
-  ) || voices.find((v) => v.lang.startsWith('en'));
-
-  if (preferredVoice) {
-    utterance.voice = preferredVoice;
+  const cleanText = (text || '').trim();
+  if (!cleanText) {
+    if (onEnd) onEnd();
+    return;
   }
 
-  if (onEnd) {
-    utterance.onend = onEnd;
-    utterance.onerror = onEnd;
+  let hasEnded = false;
+  const safeEnd = () => {
+    if (!hasEnded) {
+      hasEnded = true;
+      if (onEnd) onEnd();
+    }
+  };
+
+  // Helper for High-Fidelity Online Audio Fallback (Guaranteed to work on HP / Mobile browsers)
+  const playAudioFallback = () => {
+    try {
+      const tl = lang.startsWith('en-GB') ? 'en-gb' : lang.startsWith('id') ? 'id' : 'en-us';
+      // Truncate query to 200 chars max for Google TTS standard
+      const ttsQuery = encodeURIComponent(cleanText.slice(0, 200));
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${tl}&q=${ttsQuery}`;
+
+      const audio = new Audio(audioUrl);
+      currentAudioElement = audio;
+
+      audio.onended = () => {
+        currentAudioElement = null;
+        safeEnd();
+      };
+      audio.onerror = (e) => {
+        console.warn('Audio fallback error:', e);
+        currentAudioElement = null;
+        safeEnd();
+      };
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('Audio play was prevented or failed:', err);
+          safeEnd();
+        });
+      }
+    } catch (e) {
+      console.warn('Fallback audio failed:', e);
+      safeEnd();
+    }
+  };
+
+  // 1. Check if native Web SpeechSynthesis is supported and active
+  if ('speechSynthesis' in window) {
+    try {
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = lang;
+      utterance.rate = 0.9;
+      utterance.pitch = 1.0;
+
+      const voices = window.speechSynthesis.getVoices() || [];
+      if (voices.length > 0) {
+        const langPrefix = lang.split('-')[0].toLowerCase();
+        // Priority: exact match, prefix match, or any English voice (including Google voices on Android)
+        const voiceMatch =
+          voices.find((v) => v.lang && v.lang.toLowerCase() === lang.toLowerCase()) ||
+          voices.find((v) => v.lang && v.lang.toLowerCase().startsWith(langPrefix)) ||
+          voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('en'));
+        if (voiceMatch) {
+          utterance.voice = voiceMatch;
+        }
+      }
+
+      let speechStarted = false;
+
+      utterance.onstart = () => {
+        speechStarted = true;
+      };
+
+      utterance.onend = () => {
+        safeEnd();
+      };
+
+      utterance.onerror = (err) => {
+        console.warn('SpeechSynthesis error on mobile, switching to audio fallback:', err);
+        playAudioFallback();
+      };
+
+      // Slight timeout before speaking to allow Android Chrome event loop to clear previous cancel()
+      setTimeout(() => {
+        try {
+          window.speechSynthesis.speak(utterance);
+        } catch (_) {
+          playAudioFallback();
+        }
+      }, 50);
+
+      // Fallback timer: if onstart hasn't fired within 1.2s on mobile, speechSynthesis is likely muted/stalled
+      setTimeout(() => {
+        if (!speechStarted && !hasEnded) {
+          console.info('SpeechSynthesis did not start in time on mobile, using audio fallback');
+          window.speechSynthesis.cancel();
+          playAudioFallback();
+        }
+      }, 1200);
+
+      return;
+    } catch (err) {
+      console.warn('SpeechSynthesis invocation exception:', err);
+      playAudioFallback();
+      return;
+    }
   }
 
-  window.speechSynthesis.speak(utterance);
+  // If SpeechSynthesis not available in browser
+  playAudioFallback();
+};
+
+// Helper to derive speech sentences from uploaded flashcards and boss quizzes
+export const deriveSpeechSentences = (flashcards = [], bossQuizzes = [], defaultCategory = '') => {
+  const speechItems = [];
+  const timestamp = Date.now();
+
+  // 1. Convert Flashcards to Speech Sentences
+  (flashcards || []).forEach((fc, idx) => {
+    const correctWord = fc.correctChoice === 'B' ? fc.wordB : fc.wordA;
+    let sentence = (fc.contextQuestion || '').replace(/_{2,}/g, correctWord).trim();
+    if (!sentence || sentence.length < 5) {
+      sentence = `We must clearly differentiate between ${fc.wordA} and ${fc.wordB}.`;
+    }
+    const cat = fc.category || defaultCategory || 'Confusion Words';
+
+    speechItems.push({
+      id: `speech_fc_${timestamp}_${idx + 1}`,
+      sentence,
+      category: cat,
+      difficulty: 'Intermediate',
+      focusWords: [fc.wordA, fc.wordB].filter(Boolean),
+      phoneticTips: `Latih pelafalan kontras antara kata "${fc.wordA}" dan "${fc.wordB}".`,
+    });
+  });
+
+  // 2. Convert Boss Quizzes to Speech Sentences
+  (bossQuizzes || []).forEach((bq, idx) => {
+    const sentence = (bq.sentence || '').trim();
+    if (sentence && sentence.length >= 8) {
+      const cat = bq.category || defaultCategory || 'TKA Inversion';
+      const words = sentence.split(/\s+/).map((w) => w.replace(/[^a-zA-Z]/g, '')).filter((w) => w.length > 5);
+
+      speechItems.push({
+        id: `speech_bq_${timestamp}_${idx + 1}`,
+        sentence,
+        category: cat,
+        difficulty: 'Advanced',
+        focusWords: words.slice(0, 3),
+        phoneticTips: 'Perhatikan penekanan kata (stress) dan intonasi kalimat formal ini.',
+      });
+    }
+  });
+
+  return speechItems;
 };
 
 // 2. Speech Recognition Check & Factory

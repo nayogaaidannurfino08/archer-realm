@@ -27,9 +27,11 @@ import {
 } from '../../services/geminiApi';
 import { 
   syncFlashcardsToSupabase, 
-  syncBossQuizzesToSupabase 
+  syncBossQuizzesToSupabase,
+  syncSpeechSentences
 } from '../../services/supabaseClient';
 import { playSuccessSound, playErrorSound } from '../../utils/audio';
+import { deriveSpeechSentences } from '../../utils/speech';
 
 export const UploaderView = ({ onNavigateTab }) => {
   // Navigation Section: 'upload' | 'manager'
@@ -74,9 +76,11 @@ export const UploaderView = ({ onNavigateTab }) => {
           moduleName: trimmedModuleName,
         });
         setProgressStep('Menyimpan ke Supabase & LocalStorage (Sistem Append)...');
+        const derivedSpeech = deriveSpeechSentences(mockResult.flashcards, mockResult.bossQuizzes, trimmedModuleName);
         await Promise.all([
           syncFlashcardsToSupabase(mockResult.flashcards),
           syncBossQuizzesToSupabase(mockResult.bossQuizzes),
+          syncSpeechSentences(derivedSpeech),
         ]);
         setParsedResult(mockResult);
         setBankRefreshKey((k) => k + 1);
@@ -93,10 +97,12 @@ export const UploaderView = ({ onNavigateTab }) => {
         moduleName: trimmedModuleName,
       });
 
-      setProgressStep('Menyinkronkan hasil ke Supabase Cloud & LocalStorage...');
+      setProgressStep('Menyinkronkan hasil ke Supabase Cloud, Speech Lab & LocalStorage...');
+      const derivedSpeech = deriveSpeechSentences(result.flashcards, result.bossQuizzes, trimmedModuleName);
       await Promise.all([
         syncFlashcardsToSupabase(result.flashcards),
         syncBossQuizzesToSupabase(result.bossQuizzes),
+        syncSpeechSentences(derivedSpeech),
       ]);
 
       setParsedResult(result);

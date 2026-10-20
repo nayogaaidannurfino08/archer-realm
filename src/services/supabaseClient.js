@@ -188,6 +188,20 @@ export const fetchCustomBossQuizzes = async () => {
   return getStoredItem(STORAGE_KEYS.CUSTOM_BOSS_QUIZZES, []);
 };
 
+// 5b. Sync Speech Sentences (LocalStorage Append)
+export const syncSpeechSentences = (speechSentences) => {
+  if (!Array.isArray(speechSentences) || speechSentences.length === 0) {
+    return { synced: false, count: 0 };
+  }
+  const existingSpeech = getStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, []);
+  const merged = [
+    ...speechSentences,
+    ...existingSpeech.filter((e) => !speechSentences.some((s) => s.id === e.id)),
+  ];
+  setStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, merged);
+  return { synced: true, count: merged.length };
+};
+
 // 6. Delete Questions by Specific Category (Supabase & LocalStorage)
 export const deleteCategoryFromSupabase = async (category) => {
   if (!category) return { success: false, error: 'Category is required' };
@@ -200,6 +214,10 @@ export const deleteCategoryFromSupabase = async (category) => {
   const localBq = getStoredItem(STORAGE_KEYS.CUSTOM_BOSS_QUIZZES, []);
   const updatedBq = localBq.filter((q) => q.category !== category);
   setStoredItem(STORAGE_KEYS.CUSTOM_BOSS_QUIZZES, updatedBq);
+
+  const localSpeech = getStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, []);
+  const updatedSpeech = localSpeech.filter((s) => s.category !== category);
+  setStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, updatedSpeech);
 
   // 2. Remove from Supabase if configured
   if (isSupabaseConfigured()) {
@@ -224,6 +242,7 @@ export const resetAllQuestionBanks = async () => {
   // 1. Clear LocalStorage custom questions
   setStoredItem(STORAGE_KEYS.CUSTOM_FLASHCARDS, []);
   setStoredItem(STORAGE_KEYS.CUSTOM_BOSS_QUIZZES, []);
+  setStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, []);
 
   // 2. Clear Supabase tables
   if (isSupabaseConfigured()) {
@@ -250,12 +269,13 @@ export const fetchQuestionBankSummary = async () => {
     fetchCustomBossQuizzes(),
   ]);
 
+  const speechSentences = getStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, []);
   const categoryMap = new Map();
 
   flashcards.forEach((fc) => {
     const cat = fc.category || 'Tanpa Kategori';
     if (!categoryMap.has(cat)) {
-      categoryMap.set(cat, { category: cat, flashcardsCount: 0, bossQuizzesCount: 0, totalCount: 0 });
+      categoryMap.set(cat, { category: cat, flashcardsCount: 0, bossQuizzesCount: 0, speechCount: 0, totalCount: 0 });
     }
     const item = categoryMap.get(cat);
     item.flashcardsCount += 1;
@@ -265,10 +285,20 @@ export const fetchQuestionBankSummary = async () => {
   bossQuizzes.forEach((bq) => {
     const cat = bq.category || 'Tanpa Kategori';
     if (!categoryMap.has(cat)) {
-      categoryMap.set(cat, { category: cat, flashcardsCount: 0, bossQuizzesCount: 0, totalCount: 0 });
+      categoryMap.set(cat, { category: cat, flashcardsCount: 0, bossQuizzesCount: 0, speechCount: 0, totalCount: 0 });
     }
     const item = categoryMap.get(cat);
     item.bossQuizzesCount += 1;
+    item.totalCount += 1;
+  });
+
+  speechSentences.forEach((s) => {
+    const cat = s.category || 'Tanpa Kategori';
+    if (!categoryMap.has(cat)) {
+      categoryMap.set(cat, { category: cat, flashcardsCount: 0, bossQuizzesCount: 0, speechCount: 0, totalCount: 0 });
+    }
+    const item = categoryMap.get(cat);
+    item.speechCount = (item.speechCount || 0) + 1;
     item.totalCount += 1;
   });
 

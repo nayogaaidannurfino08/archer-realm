@@ -5,6 +5,7 @@ import {
   RotateCcw, 
   Layers, 
   Swords, 
+  Mic,
   AlertTriangle, 
   CheckCircle2, 
   RefreshCw,
@@ -212,6 +213,12 @@ export const QuestionBankManager = ({ onDataChanged }) => {
                       <Swords className="w-3 h-3" />
                       {catItem.bossQuizzesCount} Boss Quizzes
                     </span>
+                    {catItem.speechCount > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
+                        <Mic className="w-3 h-3" />
+                        {catItem.speechCount} Speech Lab
+                      </span>
+                    )}
                   </div>
                 </div>
 

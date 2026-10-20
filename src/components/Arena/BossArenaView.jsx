@@ -87,20 +87,26 @@ export const BossArenaView = ({ activeCharacter = 'verdant', onBackToDashboard, 
     setSelectedOption(null);
   }, [allQuizzes, clearAllTimeouts]);
 
-  // Sync from Supabase on mount with local mock fallback
+  // Sync from Supabase on mount (executed strictly ONCE to prevent infinite resets)
   useEffect(() => {
     let isMounted = true;
     fetchCustomBossQuizzes().then((remoteQuizzes) => {
-      if (isMounted && remoteQuizzes && remoteQuizzes.length > 0) {
+      if (!isMounted) return;
+      if (remoteQuizzes && remoteQuizzes.length > 0) {
         const freshCombined = getCombinedMasterQuizzes(remoteQuizzes);
         setAllQuizzes(freshCombined);
-        applyFilterAndShuffle(selectedCategory, freshCombined);
+        setQuizzes((prevQuizzes) => {
+          const filtered = selectedCategory === 'ALL'
+            ? freshCombined
+            : freshCombined.filter((q) => (q.category || '').toLowerCase() === selectedCategory.toLowerCase());
+          return shuffleArray(filtered);
+        });
       }
     });
     return () => {
       isMounted = false;
     };
-  }, [getCombinedMasterQuizzes, applyFilterAndShuffle, selectedCategory]);
+  }, []); // Run strictly ONCE on mount!
 
   // Game States
   const [currentIndex, setCurrentIndex] = useState(0);

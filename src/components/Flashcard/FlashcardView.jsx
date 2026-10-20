@@ -62,20 +62,27 @@ export const FlashcardView = ({ onBackToDashboard, onNavigateTab }) => {
     setWrongCardData(null);
   }, [allCards]);
 
-  // Sync from Supabase on mount with local mock fallback
+  // Sync from Supabase on mount (executed strictly ONCE to prevent infinite re-shuffling)
   useEffect(() => {
     let isMounted = true;
     fetchCustomFlashcards().then((remoteCards) => {
-      if (isMounted && remoteCards && remoteCards.length > 0) {
+      if (!isMounted) return;
+      if (remoteCards && remoteCards.length > 0) {
         const freshCombined = getCombinedMasterCards(remoteCards);
         setAllCards(freshCombined);
-        applyFilterAndShuffle(selectedCategory, freshCombined);
+        setDeck((prevDeck) => {
+          // If the deck is in initial state, shuffle fresh cards
+          const filtered = selectedCategory === 'ALL'
+            ? freshCombined
+            : freshCombined.filter((c) => (c.category || '').toLowerCase() === selectedCategory.toLowerCase());
+          return shuffleArray(filtered);
+        });
       }
     });
     return () => {
       isMounted = false;
     };
-  }, [getCombinedMasterCards, applyFilterAndShuffle, selectedCategory]);
+  }, []); // Run strictly ONCE on mount!
 
   // Handle Category Filter Change
   const handleCategoryChange = (e) => {

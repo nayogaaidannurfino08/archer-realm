@@ -1,23 +1,25 @@
 import React, { useState } from 'react';
 import { Volume2, VolumeX, Sparkles, Mic } from 'lucide-react';
-import { speakSentence } from '../../utils/speech';
+import { speakSentence, stopSpeaking } from '../../utils/speech';
 
 export const SentenceCard = ({ sentenceData, liveTranscript = '', speechLang = 'en-US' }) => {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   const handlePlayAudio = () => {
     if (isPlayingAudio) {
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      stopSpeaking();
       setIsPlayingAudio(false);
       return;
     }
 
     setIsPlayingAudio(true);
-    speakSentence(sentenceData.sentence, () => {
-      setIsPlayingAudio(false);
-    }, speechLang);
+    speakSentence(
+      sentenceData.sentence,
+      () => {
+        setIsPlayingAudio(false);
+      },
+      speechLang
+    );
   };
 
   return (

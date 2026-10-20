@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Activity, ArrowLeft, AlertCircle, Award, RotateCcw, Plus, Sparkles, Globe } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Mic, Activity, ArrowLeft, AlertCircle, Award, RotateCcw, Plus, Sparkles, Globe, Filter } from 'lucide-react';
 
 import { mockSpeechSentences } from '../../data/mockSpeechSentences';
 import { SentenceCard } from './SentenceCard';
@@ -10,17 +10,72 @@ import {
   createSpeechRecognition, 
   isSpeechRecognitionSupported, 
   evaluatePronunciation,
-  extractCleanTranscript 
+  extractCleanTranscript,
+  deriveSpeechSentences
 } from '../../utils/speech';
 import { playSuccessSound, playVictoryFanfare } from '../../utils/audio';
 import { getStoredItem, setStoredItem, STORAGE_KEYS } from '../../utils/storage';
+import { shuffleArray } from '../../utils/shuffle';
 
 export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
+  // Helper to load combined master sentences (Custom + Auto-derived from Uploaded Flashcards & Boss Quizzes)
+  const getCombinedMasterSentences = () => {
+    let stored = getStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, []);
+
+    // Auto-derive if stored is empty but user has uploaded flashcards or boss quizzes
+    if (!stored || stored.length === 0) {
+      const storedFc = getStoredItem(STORAGE_KEYS.CUSTOM_FLASHCARDS, []);
+      const storedBq = getStoredItem(STORAGE_KEYS.CUSTOM_BOSS_QUIZZES, []);
+      if ((storedFc && storedFc.length > 0) || (storedBq && storedBq.length > 0)) {
+        stored = deriveSpeechSentences(storedFc, storedBq);
+        if (stored.length > 0) {
+          setStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, stored);
+        }
+      }
+    }
+
+    let combined = Array.isArray(stored) ? [...stored] : [];
+    if (mockSpeechSentences && mockSpeechSentences.length > 0) {
+      combined = [...combined, ...mockSpeechSentences.filter((m) => !combined.some((c) => c.id === m.id))];
+    }
+    return combined;
+  };
+
+  const [allSentences, setAllSentences] = useState(getCombinedMasterSentences);
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+
+  // Extract distinct categories from all sentences
+  const categories = useMemo(() => {
+    const cats = new Set();
+    allSentences.forEach((s) => {
+      const cat = (s.category || '').trim();
+      if (cat) cats.add(cat);
+    });
+    return Array.from(cats);
+  }, [allSentences]);
+
+  // Active filtered sentences
   const [sentences, setSentences] = useState(() => {
-    const stored = getStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, []);
-    return stored.length > 0 ? stored : [...mockSpeechSentences];
+    const master = getCombinedMasterSentences();
+    return shuffleArray(master);
   });
   const totalSentences = sentences.length;
+
+  const handleCategoryChange = (e) => {
+    const newCat = e.target.value;
+    setSelectedCategory(newCat);
+    let filtered = allSentences;
+    if (newCat !== 'ALL') {
+      filtered = allSentences.filter((s) => (s.category || '').toLowerCase() === newCat.toLowerCase());
+    }
+    const shuffled = shuffleArray(filtered);
+    setSentences(shuffled);
+    setCurrentIndex(0);
+    setResults(null);
+    setLiveTranscript('');
+    setMicError(null);
+    setIsCompleted(false);
+  };
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
@@ -65,14 +120,15 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
     const newObj = {
       id: `custom-speech-${Date.now()}`,
       sentence: text,
-      category: 'Latihan Kustom',
+      category: selectedCategory !== 'ALL' ? selectedCategory : 'Latihan Kustom',
       difficulty: 'Pribadi',
       focusWords: words.slice(0, 4),
       phoneticTips: 'Lafalkan kata dengan artikulasi jelas dan ritme natural.',
     };
-    const updated = [newObj, ...sentences];
-    setSentences(updated);
+    const updated = [newObj, ...allSentences];
+    setAllSentences(updated);
     setStoredItem(STORAGE_KEYS.CUSTOM_SPEECH_SENTENCES, updated);
+    setSentences([newObj, ...sentences]);
     setCustomInput('');
     setCurrentIndex(0);
     setResults(null);
@@ -247,8 +303,28 @@ export const SpeechLabView = ({ onBackToDashboard, onNavigateTab }) => {
           </div>
         </div>
 
-        {/* Right Badges, Accent Selector & Add Sentence Button */}
+        {/* Right Badges, Filter, Accent Selector & Add Sentence Button */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Chapter / Category Filter Dropdown */}
+          {categories.length > 0 && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700/80 text-xs shadow-sm">
+              <Filter className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <select
+                value={selectedCategory}
+                onChange={handleCategoryChange}
+                aria-label="Pilih Bab Latihan"
+                className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="ALL" className="bg-slate-900 text-white">Semua Bab (Campur)</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat} className="bg-slate-900 text-white">
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Accent / Speech Recognition Language Selector */}
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700/80 text-xs shadow-sm">
             <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
