@@ -34,19 +34,21 @@ From the provided learning material, articles, reading texts, or grammar notes, 
 
 1. "flashcards" (Confusion Words / Vocabulary Mastery):
    - Pairs of easily confused English words (e.g. Affect vs Effect, Complement vs Compliment, Principle vs Principal, Beside vs Besides, Stationary vs Stationery, Illusion vs Allusion, Eminent vs Imminent, Advice vs Advise, Cite vs Site, Loose vs Lose).
-   - Generate AT LEAST 20 to 25 unique flashcard duel items.
+   - Generate EXACTLY 20 unique flashcard duel items.
    - Fill-in-the-blank question using '_____'.
    - WordA corresponds to Choice A, WordB corresponds to Choice B.
    - correctChoice MUST be either "A" or "B".
-   - Include friendly explanation in Indonesian (whyWrong, keyRule, example).
+   - Include concise explanation in Indonesian (whyWrong, keyRule, example) - keep each field strictly 1 to 2 short sentences.
 
-2. "boss_quizzes" or "bossQuizzes" (TKA Grammar Inversion & True/False Comprehension):
-   - Generate AT LEAST 20 to 25 True/False grammar analysis questions (e.g. Subjunctive Mood, Negative Inversion, Inverted Conditionals, Subject-Verb Agreement, Parallelism).
+2. "boss_quizzes" (TKA Grammar Inversion & True/False Comprehension):
+   - Generate EXACTLY 20 True/False grammar analysis questions (e.g. Subjunctive Mood, Negative Inversion, Inverted Conditionals, Subject-Verb Agreement, Parallelism).
    - Set questionText to "Read the sentence and choose True or False."
    - Two options: Label "A" is "True", Label "B" is "False". Exactly one has isCorrect: true.
-   - Include explanation with errorFound, rule, and correctSentence.
+   - Include concise explanation with errorFound, rule, and correctSentence (strictly 1 to 2 short sentences per field).
 
-CRITICAL: Return ONLY a valid JSON object without markdown formatting:
+CRITICAL CONSTRAINTS:
+- Keep all explanations concise and punchy so that the entire output strictly fits within token limits without being truncated.
+- Return ONLY valid JSON without markdown code blocks or conversational text:
 {
   "flashcards": [
     {
@@ -83,6 +85,128 @@ CRITICAL: Return ONLY a valid JSON object without markdown formatting:
 }
 `;
 
+// Helper: Auto-repair truncated JSON and fallback object extractor
+export function repairAndParseJson(rawText) {
+  if (!rawText || typeof rawText !== 'string') return null;
+
+  let cleaned = rawText.trim();
+  // Strip markdown code fences if present
+  if (cleaned.startsWith('```json')) {
+    cleaned = cleaned.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+  } else if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
+  }
+  cleaned = cleaned.trim();
+
+  // 1. Direct standard JSON.parse
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (parsed && (Array.isArray(parsed.flashcards) || Array.isArray(parsed.boss_quizzes) || Array.isArray(parsed.bossQuizzes))) {
+      return parsed;
+    }
+  } catch (_) {}
+
+  // 2. Structural repair of truncated JSON (e.g. cut off mid-object or mid-array at token limit)
+  const lastBraceIndex = cleaned.lastIndexOf('}');
+  if (lastBraceIndex !== -1) {
+    let candidate = cleaned.substring(0, lastBraceIndex + 1).trim();
+    candidate = candidate.replace(/,\s*$/, ''); // Remove trailing comma if any
+
+    const stack = [];
+    let inString = false;
+    let escape = false;
+
+    for (let i = 0; i < candidate.length; i++) {
+      const char = candidate[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (char === '\\') {
+        escape = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === '{') stack.push('}');
+        else if (char === '[') stack.push(']');
+        else if (char === '}' || char === ']') {
+          if (stack.length > 0 && stack[stack.length - 1] === char) {
+            stack.pop();
+          }
+        }
+      }
+    }
+
+    let suffix = '';
+    while (stack.length > 0) {
+      suffix += stack.pop();
+    }
+
+    try {
+      const repaired = JSON.parse(candidate + suffix);
+      if (repaired && (Array.isArray(repaired.flashcards) || Array.isArray(repaired.boss_quizzes) || Array.isArray(repaired.bossQuizzes))) {
+        console.warn('[Gemini Parser] Berhasil mereparasi respon JSON yang terpotong.');
+        return repaired;
+      }
+    } catch (_) {}
+  }
+
+  // 3. Robust object-level extractor fallback: recovers all complete items
+  const flashcards = [];
+  const bossQuizzes = [];
+  let depth = 0;
+  let startIndex = -1;
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{') {
+        if (depth === 0) startIndex = i;
+        depth++;
+      } else if (char === '}') {
+        depth--;
+        if (depth === 0 && startIndex !== -1) {
+          const block = cleaned.substring(startIndex, i + 1);
+          try {
+            const obj = JSON.parse(block);
+            if (obj.wordA || obj.word || (obj.pair && obj.meaning)) {
+              flashcards.push(obj);
+            } else if (obj.sentence || obj.questionText || obj.question_text) {
+              bossQuizzes.push(obj);
+            }
+          } catch (_) {}
+          startIndex = -1;
+        }
+      }
+    }
+  }
+
+  if (flashcards.length > 0 || bossQuizzes.length > 0) {
+    console.warn(`[Gemini Parser] Fallback extractor meregenerasi ${flashcards.length} flashcard dan ${bossQuizzes.length} boss quiz.`);
+    return { flashcards, boss_quizzes: bossQuizzes };
+  }
+
+  return null;
+}
+
 // Helper: Dynamically discover active generative models authorized for this API key
 async function getSupportedModelList(apiKey) {
   try {
@@ -99,11 +223,19 @@ async function getSupportedModelList(apiKey) {
           .map((m) => m.name.replace(/^models\//, ''));
 
         if (generationModels.length > 0) {
-          // Sort so newest active flash models come first (3.8-flash, 3.6-flash, etc.)
+          // Sort so newest active flash models come first
           return generationModels.sort((a, b) => {
-            const aPref = a.includes('3.8-flash') ? -4 : a.includes('3.6-flash') ? -3 : a.includes('3.5-flash') ? -2 : a.includes('flash') ? -1 : 1;
-            const bPref = b.includes('3.8-flash') ? -4 : b.includes('3.6-flash') ? -3 : b.includes('3.5-flash') ? -2 : b.includes('flash') ? -1 : 1;
-            return aPref - bPref;
+            const getScore = (name) => {
+              if (name.includes('3.8-flash')) return -10;
+              if (name.includes('3.6-flash')) return -9;
+              if (name.includes('2.0-flash')) return -8;
+              if (name.includes('1.5-flash-latest')) return -7;
+              if (name.includes('1.5-flash')) return -6;
+              if (name.includes('flash')) return -5;
+              if (name.includes('pro')) return 1;
+              return 0;
+            };
+            return getScore(a) - getScore(b);
           });
         }
       }
@@ -122,8 +254,14 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
     throw new Error('VITE_GEMINI_API_KEY belum terpasang di Vercel/Environment.');
   }
 
-  // 2. Construct prompt parts
+  // 2. Construct prompt parts (Limit massive text input to 25k chars for optimal token budgeting)
   const parts = [];
+  const trimmedInput = (textContent || '').trim();
+  const safeText =
+    trimmedInput.length > 25000
+      ? `${trimmedInput.substring(0, 25000)}\n\n[Materi input dipadatkan pada 25.000 karakter pertama]`
+      : trimmedInput;
+
   const userModuleHint =
     moduleName && moduleName.trim().length > 0
       ? `\n\n=== MODULE / CHAPTER TAG: "${moduleName.trim()}" (Use this tag for the "category" field of all generated items) ===`
@@ -131,7 +269,7 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
 
   parts.push({
     text: `${GEMINI_SYSTEM_INSTRUCTION}${userModuleHint}\n\n=== USER PROVIDED MATERIAL TO PARSE ===\n${
-      textContent || '(See attached document)'
+      safeText || '(See attached document)'
     }`,
   });
 
@@ -155,11 +293,13 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
   const fallbackModels = [
     'gemini-3.8-flash',
     'gemini-3.6-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash',
     'gemini-3.5-flash-lite',
     'gemini-flash-latest',
     'gemini-4-argon',
-    'gemini-2.5-flash',
-    'gemini-1.5-flash',
+    'gemini-1.5-pro',
   ];
 
   // Candidates list: dynamic discovered models first, followed by standard fallback list
@@ -210,7 +350,10 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
         }
 
         const data = await response.json();
-        const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        // Join all parts if response is fragmented into multiple parts
+        const textOutput = (data.candidates?.[0]?.content?.parts || [])
+          .map((p) => p.text || '')
+          .join('');
 
         if (!textOutput || textOutput.trim().length === 0) {
           attemptedErrors.push(`[${apiVersion}/${cleanModel}]: Empty response`);
@@ -238,29 +381,12 @@ export const parseMaterialWithGemini = async ({ textContent, file = null, module
     );
   }
 
-  // 5. Defensive JSON Parsing
-  let cleanedText = rawText.trim();
-  if (cleanedText.startsWith('```json')) {
-    cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-  } else if (cleanedText.startsWith('```')) {
-    cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-  }
+  // 5. Defensive JSON Parsing with Auto-Repair
+  const parsed = repairAndParseJson(rawText);
 
-  let parsed = null;
-  try {
-    parsed = JSON.parse(cleanedText);
-  } catch (_) {
-    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        parsed = JSON.parse(jsonMatch[0]);
-      } catch (_) {}
-    }
-
-    if (!parsed) {
-      console.error('Failed to parse Gemini output:', cleanedText);
-      throw new Error('Respon dari Google Gemini tidak berformat JSON valid. Silakan coba unggah materi kembali.');
-    }
+  if (!parsed) {
+    console.error('Failed to parse Gemini output:', rawText);
+    throw new Error('Respon dari Google Gemini tidak berformat JSON valid. Silakan coba unggah materi kembali.');
   }
 
   // 6. Comprehensive Normalization for both Schemas
